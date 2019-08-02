@@ -1,0 +1,84 @@
+"0","parameterestimates(fit_big6_status_multi_med_model_h3alt) %>%
+  as.data.frame() %>% 
+  filter(str_detect(label, ""^a"") |
+         str_detect(label, ""^b"") |
+         str_detect(label, ""^c"") |
+         str_detect(label, ""^indirect_"")) %>% 
+  rename(ci_upper = ci.upper,
+         ci_lower = ci.lower) %>% 
+  mutate(parameter = case_when(
+    label == ""a1"" ~ ""P1(T) Extraversion -> P2(T) Extraversion"",
+    label == ""a2"" ~ ""P1(T) Agreeableness -> P2(T) Agreeableness"",
+    label == ""a3"" ~ ""P1(T) Conscientiousness -> P2(T) Conscientiousness"",
+    label == ""a4"" ~ ""P1(T) Neuroticism -> P2(T) Neuroticism"",
+    label == ""a5"" ~ ""P1(T) Openness -> P2(T) Openness"",
+    label == ""a6"" ~ ""P1(T) Honesty-Propriety -> P2(T) Honesty-Propriety"",
+    label == ""b1"" ~ ""P2(T) Extraversion -> P2(T) Leadership"",
+    label == ""b2"" ~ ""P2(T) Agreeableness -> P2(T) Leadership"",
+    label == ""b3"" ~ ""P2(T) Conscientiousness -> P2(T) Leadership"",
+    label == ""b4"" ~ ""P2(T) Neuroticism -> P2(T) Leadership"",
+    label == ""b5"" ~ ""P2(T) Openness -> P2(T) Leadership"",
+    label == ""b6"" ~ ""P2(T) Honesty-Propriety -> P2(T) Leadership"",
+    label == ""c1"" ~ ""P1(T) Extraversion -> P2(T) Leadership"",
+    label == ""c2"" ~ ""P1(T) Agreeableness -> P2(T) Leadership"",
+    label == ""c3"" ~ ""P1(T) Conscientiousness -> P2(T) Leadership"",
+    label == ""c4"" ~ ""P1(T) Neuroticism -> P2(T) Leadership"",
+    label == ""c5"" ~ ""P1(T) Openness -> P2(T) Leadership"",
+    label == ""c6"" ~ ""P1(T) Honesty-Propriety -> P2(T) Leadership"",
+    label == ""indirect_ex"" ~ ""Indirect Extraversion"",
+    label == ""indirect_ag"" ~ ""Indirect Agreeableness"",
+    label == ""indirect_co"" ~ ""Indirect Conscientiousness"",
+    label == ""indirect_ne"" ~ ""Indirect Neuroticism"",
+    label == ""indirect_op"" ~ ""Indirect Openness "",
+    label == ""indirect_hp"" ~ ""Indirect Honesty-Propriety""),
+         label == fct_relevel(label,
+                             ""a1"",
+                             ""a2"",
+                             ""a3"",
+                             ""a4"",
+                             ""a5"",
+                             ""a6"",
+                             ""b1"",
+                             ""b2"",
+                             ""b3"",
+                             ""b4"",
+                             ""b5"",
+                             ""b6"",
+                             ""c1"",
+                             ""c2"",
+                             ""c3"",
+                             ""c4"",
+                             ""c5"",
+                             ""c6"",),
+        pvalue = ifelse(pvalue >= .001, 
+                        str_pad(str_replace(round(pvalue, 3),
+                                            ""0."", "".""), 4, 
+                                side = ""right"", pad =""0""),  
+                        ""< .001""),
+        est = round(est, 2),
+        est = ifelse(str_detect(est, ""\\..$""), paste0(est, ""0""), 
+                   ifelse(str_detect(est, ""^0$""), paste0(est, "".00""), est)),
+        est = cell_spec(est, ""html"", 
+                            bold = ifelse(ci_lower > 0, TRUE, FALSE)),
+        ci_lower = round(ci_lower, 2),
+        ci_lower = ifelse(str_detect(ci_lower, ""\\..$""), paste0(ci_lower, ""0""), 
+                   ifelse(str_detect(ci_lower, ""^0$""), paste0(ci_lower, "".00""), ci_lower)),
+        ci_lower = cell_spec(ci_lower, ""html"", 
+                            bold = ifelse(ci_lower > 0, TRUE, FALSE)),
+        ci_upper = round(ci_upper, 2),
+        ci_upper = ifelse(str_detect(ci_upper, ""\\..$""), paste0(ci_upper, ""0""), 
+                   ifelse(str_detect(ci_upper, ""^0$""), paste0(ci_upper, "".00""), ci_upper)),
+        ci_upper = cell_spec(ci_upper, ""html"",
+                            bold = ifelse(pvalue == ""< .001"", TRUE,
+                                   ifelse(as.numeric(pvalue) < .05, TRUE, FALSE))),
+        z = round(z, 2)) %>% 
+  arrange(label) %>% 
+  select(parameter, est, ci_lower, ci_upper, z, pvalue) %>% 
+  distinct() %>% 
+  knitr::kable(caption = ""All Big Six and Leadership Mediation Results"",
+              format = ""html"", escape = F) %>% 
+ kable_styling(""striped"", full_width = F) 
+"
+"2","Error in ""lavaan.fsr"" %in% class(object) : 
+  object 'fit_big6_status_multi_med_model_h3alt' not found
+"

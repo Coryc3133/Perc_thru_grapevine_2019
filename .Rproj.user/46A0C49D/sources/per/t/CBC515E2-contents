@@ -1,0 +1,2441 @@
+---
+title: 'Analyses in Perceiving through the Grapevine: A Network Approach to Reputations'
+author: "Cory K. Costello & Sanjay Srivastava"
+date: "last knitted: `r Sys.time()`"
+output:
+    html_document:
+      toc: true
+      toc_float: true
+      code_folding: show
+      df_print: paged
+---
+
+# Data & Libraries
+Here I'll read in the data and load the libraries I'll use, including the 
+```{r setup, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, cache = TRUE)
+library(rio)
+library(tidyverse)
+library(ReputationModelR)
+study1 <- import("Data/rep_s1_4ms.csv")
+study2 <- import("Data/rep_s2_4ms.csv") %>% 
+  # missing condition are "", but need to be NA
+  mutate(condition = ifelse(condition == "", NA, condition))
+integrated <- import("Data/rep_integrated_4ms.csv")
+```
+
+# Study 1
+
+I'll start with Study 1. First I'll fit all of the main models, which will estimate relative elevation and differential hearsay consensus, differential hearsay accuracy, and differential direct accuracy. Then, to match the order of the manuscript, I'll display the relative elevation results followed by the differential results. This will be followed by the regression analyses; distinctive hearsay accuracy and the moderator analyses, which each require regressions (instead of working with the variance-covariance & mean structure created in the main models).
+
+Study 2 will look similar, but will start with the condition analyses, then the mediation models. The integrated results will be in a similar order to the Study 1 results.
+
+
+## Fit Models
+
+For each of the Big Six, I'll estimate the full variance-covariance and mean structure with appropriate equality constraints using the `ReputationModelR` `rep_analyses_auto()` function I wrote. I'll save the relative elevation and differential tables to put together later, and display the summary of the model object.
+### Agreeableness
+```{r agree_model_fit}
+agree_model <- rep_analyses_auto(study1, 
+                  p1_reports =  c("A_C_agreeableness", "C_A_agreeableness"),
+                  p2_reports =  c("B_C_agreeableness", "D_A_agreeableness"),
+                  target_self = c("C_C_agreeableness", "A_A_agreeableness"))
+agree_elevation <- ez_elevation_table(agree_model)
+agree_differential <- ez_differential_table(agree_model)
+summary(agree_model)
+```
+
+### Conscientiousness
+```{r consc_model_fit}
+consc_model <- rep_analyses_auto(study1, 
+                  p1_reports =  c("A_C_conscientiousness", "C_A_conscientiousness"),
+                  p2_reports =  c("B_C_conscientiousness", "D_A_conscientiousness"),
+                  target_self = c("C_C_conscientiousness", "A_A_conscientiousness"))
+consc_elevation <- ez_elevation_table(consc_model)
+consc_differential <- ez_differential_table(consc_model)
+summary(consc_model)
+```
+
+### Honesty-Propriety
+```{r hp_model_fit}
+hp_model <- rep_analyses_auto(study1, 
+                  p1_reports =  c("A_C_hp", "C_A_hp"),
+                  p2_reports =  c("B_C_hp", "D_A_hp"),
+                  target_self = c("C_C_hp", "A_A_hp"))
+hp_elevation <- ez_elevation_table(hp_model)
+hp_differential <- ez_differential_table(hp_model)
+summary(hp_model)
+```
+
+### Neuroticism
+```{r neuro_model_fit}
+neuro_model <- rep_analyses_auto(study1, 
+                  p1_reports =  c("A_C_neuroticism", "C_A_neuroticism"),
+                  p2_reports =  c("B_C_neuroticism", "D_A_neuroticism"),
+                  target_self = c("C_C_neuroticism", "A_A_neuroticism"))
+neuro_elevation <- ez_elevation_table(neuro_model)
+neuro_differential <- ez_differential_table(neuro_model)
+summary(neuro_model)
+```
+
+### Extraversion
+```{r extra_model_fit}
+extra_model <- rep_analyses_auto(study1, 
+                  p1_reports =  c("A_C_extraversion", "C_A_extraversion"),
+                  p2_reports =  c("B_C_extraversion", "D_A_extraversion"),
+                  target_self = c("C_C_extraversion", "A_A_extraversion"))
+extra_elevation <- ez_elevation_table(extra_model)
+extra_differential <- ez_differential_table(extra_model)
+summary(extra_model)
+```
+
+### Openness
+```{r open_model_fit}
+open_model <- rep_analyses_auto(study1, 
+                  p1_reports =  c("A_C_openness", "C_A_openness"),
+                  p2_reports =  c("B_C_openness", "D_A_openness"),
+                  target_self = c("C_C_openness", "A_A_openness"))
+open_elevation <- ez_elevation_table(open_model)
+open_differential <- ez_differential_table(open_model)
+summary(open_model)
+```
+
+## Relative Elevation
+### Elevation Results
+
+And here is a table of the relative elevation results, similar to Table 1 in the manuscript.
+```{r rel_el_tbl}
+library(kableExtra)
+mutate(agree_elevation$elevation_table,
+       domain = "Agreeableness") %>% 
+  rbind(mutate(consc_elevation$elevation_table,
+               domain = "Conscientiousness")) %>% 
+  rbind(mutate(hp_elevation$elevation_table,
+               domain = "Honesty-Propriety")) %>% 
+  rbind(mutate(neuro_elevation$elevation_table,
+               domain = "Neuroticism")) %>% 
+  rbind(mutate(extra_elevation$elevation_table,
+               domain = "Extraversion")) %>% 
+  rbind(mutate(open_elevation$elevation_table,
+               domain = "Openness")) %>% 
+  select(parameter, domain, everything()) %>% 
+  mutate(parameter = factor(parameter, levels = c("P1-P2 Relative Elevation",
+                                                  "Self-P2 Relative Elevation",
+                                                  "Self-P1 Relative Elevation"))) %>% 
+  arrange(parameter) %>% 
+  mutate(pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), "0.", "."), 4, side = "right", pad ="0"),  
+                         "< .001"),
+         raw_diff = round(raw_diff, 2),
+         raw_diff = ifelse(str_detect(raw_diff, "\\..$"), paste0(raw_diff, "0"), 
+                    ifelse(str_detect(raw_diff, "^0$"), paste0(raw_diff, ".00"), raw_diff)),
+         raw_diff = cell_spec(raw_diff, "html", 
+                              color = ifelse(raw_diff < 0, "red", "blue"),
+                               bold = ifelse(abs(z) >= 1.96, TRUE, FALSE)),
+         ci_upper = round(ci_upper, 2),
+         ci_upper = ifelse(str_detect(ci_upper, "\\..$"), paste0(ci_upper, "0"), 
+                    ifelse(str_detect(ci_upper, "^0$"), paste0(ci_upper, ".00"), ci_upper)),
+         ci_upper = cell_spec(ci_upper, "html", 
+                              color = ifelse(ci_upper < 0, "red", "blue"),
+                              bold = ifelse(abs(z) >= 1.96, TRUE, FALSE)),
+         ci_lower = round(ci_lower, 2),
+         ci_lower = ifelse(str_detect(ci_lower, "\\..$"), paste0(ci_lower, "0"), 
+                    ifelse(str_detect(ci_lower, "^0$"), paste0(ci_lower, ".00"), ci_lower)),
+         ci_lower = cell_spec(ci_lower, "html", 
+                              color = ifelse(ci_lower < 0, "red", "blue"),
+                              bold = ifelse(abs(z) >= 1.96, TRUE, FALSE)),
+         cohen_d = round(cohen_d, 2),
+         cohen_d = ifelse(str_detect(cohen_d, "\\..$"), paste0(cohen_d, "0"), 
+                    ifelse(str_detect(cohen_d, "^0$"), paste0(cohen_d, ".00"), cohen_d)),
+         cohen_d = cell_spec(cohen_d, "html", 
+                             color = ifelse(cohen_d < 0, "red", "blue"),
+                             bold = ifelse(abs(z) >= 1.96, TRUE, FALSE)),
+         z = round(z, 2)) %>% 
+  knitr::kable(caption = "Study 1 Relative Elevation Results",
+               format = "html", escape = F) %>%
+  kable_styling("striped", full_width = F) %>% 
+  footnote(general = "Blue = Positive Difference; Red = Negative Difference; bold = p < .05")
+
+```
+
+### Means & SDs
+And here is a table of pooled means and standard deviations for ratings, similar to Supplemental Table S3.
+```{r pooled_m_sd_tbl}
+mutate(agree_elevation$pooled_means_sd,
+       domain = "Agreeableness") %>% 
+  rbind(mutate(consc_elevation$pooled_means_sd,
+               domain = "Conscientiousness")) %>% 
+  rbind(mutate(hp_elevation$pooled_means_sd,
+               domain = "Honesty-Propriety")) %>% 
+  rbind(mutate(neuro_elevation$pooled_means_sd,
+               domain = "Neuroticism")) %>% 
+  rbind(mutate(extra_elevation$pooled_means_sd,
+               domain = "Extraversion")) %>% 
+  rbind(mutate(open_elevation$pooled_means_sd,
+               domain = "Openness")) %>% 
+  # reordering the variables
+  select(domain, perceiver, target, mean, sd) %>% 
+  unite(rating, perceiver, target, sep = " (") %>% 
+  mutate(rating = str_c(rating, ")"),
+         rating = str_to_upper(rating),
+         mean = round(mean, 2),
+         mean = str_pad(mean, width = 4, side = "right", pad = 0),
+         sd = round(sd, 2),
+         sd = str_pad(sd, width = 4, side = "right", pad = 0),) %>% 
+  unite(value, mean, sd, sep = " (") %>% 
+  mutate(value = paste0(value, ")")) %>% 
+  rename(`M (SD)` = value) %>% 
+  spread(rating, `M (SD)`) %>% 
+  select(domain, `T (T)`, everything()) %>% 
+  rename(`M (SD)` = `P1 (T)`,
+         `M (SD)` = `P2 (T)`,
+         `M (SD)` = `T (T)`) %>% 
+  knitr::kable(caption = "Study 1 Pooled Means & SDs",
+               format = "html", escape = F) %>%
+  kable_styling("striped", full_width = F) %>%
+  add_header_above(c(" " = 1, "T (T)" = 1, "P1(T)" = 1, "P2 (T)" = 1)) %>% 
+  footnote("T(T) = the target’s self-report. P1(T) = P1’s rating of the target. P2(T) = P2’s rating of the target.")
+  
+
+```
+
+## Differential Hearsay Consensus, Accuracy, and Direct Accuracy
+
+First, I'll display the differential hearsay consensus, accuracy, and direct accuracy results as a Table. This is not in the MS.
+```{r diff_results_tbl}
+diff_results_s1 <- mutate(agree_differential,
+       domain = "Agreeableness") %>% 
+  rbind(mutate(consc_differential,
+               domain = "Conscientiousness")) %>% 
+  rbind(mutate(hp_differential,
+               domain = "Honesty-Propriety")) %>% 
+  rbind(mutate(neuro_differential,
+               domain = "Neuroticism")) %>% 
+  rbind(mutate(extra_differential,
+               domain = "Extraversion")) %>% 
+  rbind(mutate(open_differential,
+               domain = "Openness")) %>% 
+  select(parameter, domain, everything()) %>% 
+  mutate(parameter = str_to_title(parameter), 
+         parameter = factor(parameter, levels = c("Hearsay Consensus",
+                                                  "Hearsay Accuracy",
+                                                  "Direct Accuracy"))) %>% 
+  arrange(parameter) %>% 
+  mutate(pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), "0.", "."), 4, side = "right", pad ="0"),  
+                         "< .001"))
+
+diff_results_s1 %>% 
+  mutate(r = round(r, 2),
+         r = ifelse(str_detect(r, "\\..$"), paste0(r, "0"), 
+                    ifelse(str_detect(r, "^0$"), paste0(r, ".00"), r)),
+         r = cell_spec(r, "html", 
+                             bold = ifelse(ci_lower > 0, TRUE, FALSE)),
+         ci_lower = round(ci_lower, 2),
+         ci_lower = ifelse(str_detect(ci_lower, "\\..$"), paste0(ci_lower, "0"), 
+                    ifelse(str_detect(ci_lower, "^0$"), paste0(ci_lower, ".00"), ci_lower)),
+         ci_lower = cell_spec(ci_lower, "html", 
+                             bold = ifelse(ci_lower > 0, TRUE, FALSE)),
+         ci_upper = round(ci_upper, 2),
+         ci_upper = ifelse(str_detect(ci_upper, "\\..$"), paste0(ci_upper, "0"), 
+                    ifelse(str_detect(ci_upper, "^0$"), paste0(ci_upper, ".00"), ci_upper)),
+         ci_upper = cell_spec(ci_upper, "html",
+                             bold = ifelse(pvalue == "< .001", TRUE,
+                                    ifelse(as.numeric(pvalue) < .05, TRUE, FALSE)))) %>% 
+  knitr::kable(caption = "Study 1 Differrntial Consensus & Accuracy Results",
+              format = "html", escape = F) %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+Next, I'll create the plots shown in the Manuscript (Figures 3, 4, & Supplemental Figure S1). First, I'll prep the plot data by entering in the meta-analytic estimates from Connelly & Ones (2010) used as benchmarks in this study, merging that into the differential results data, and doing a little clean up to prepare for the plots.
+```{r diff_results_plot_data}
+diff_plot_data <- as_tibble(cbind(
+  domain = c("Agreeableness",
+             "Conscientiousness",
+             "Honesty-Propriety",
+             "Neuroticism",
+             "Extraversion",
+             "Openness"),
+  # Connelly & Ones (2010) inter-rater r
+  co2010_irr = c(.31, .35, NA, .32, .50, .29),
+  # Connelly & Ones (2010) self-other agreement
+  co2010_soa_1 = c(.09, .13, NA, .08, .22, .12),
+  # Connelly & Ones (2010) self-other agreement again
+  # since we'll use it for direct and hearsay accuracy
+  co2010_soa_2 = c(.09, .13, NA, .08, .22, .12))) %>% 
+  gather(source, r, -domain) %>% 
+  mutate(parameter = 
+           case_when(source == "co2010_irr" ~ "Hearsay Consensus",
+                     source == "co2010_soa_1" ~ "Hearsay Accuracy",
+                     source == "co2010_soa_2" ~ "Direct Accuracy"),
+         source = str_replace_all(source, 
+                                  "co2010_irr", 
+                                  "Connelly & Ones (2010) Study 1"),
+         source = str_replace_all(source, 
+                                  "co2010_soa_1", 
+                                  "Connelly & Ones (2010) Study 2"),
+         source = str_replace_all(source, 
+                                  "co2010_soa_2", 
+                                  "Connelly & Ones (2010) Study 2"),
+         r = as.double(r),
+         # To make plotting easier, I'm going to make two
+         # variables ci.lower and ci.upper (to match the structure of our estimates)
+         # and I'll make them equal to the point estimate (since that is all we have for
+         # uncorrected estimates).
+         ci_lower = r,
+         ci_upper = r) %>% 
+  full_join(mutate(diff_results_s1,
+                   parameter = str_to_title(parameter),
+                   source = parameter)) %>% 
+  # Re-level to have plots in the order we want them in
+  mutate(domain = fct_relevel(factor(domain),
+                              "Openness",
+                              "Extraversion",
+                              "Neuroticism",
+                              "Honesty-Propriety",
+                              "Conscientiousness",
+                              "Agreeableness"))
+```
+
+Next, I'll set the theme I use in the manuscript.
+```{r plot_theme}
+# Custom theme for the reputation manuscript
+theme_rep_manuscript <-  theme(panel.background = element_blank(),
+                         panel.grid.major.x = element_line(size=.4, color="gray90"))+
+  theme(axis.line.x = element_line(color="black", size = 1),
+        axis.line.y = element_line(color="black", size = 1))+
+  theme(axis.title = element_text(size = rel(1), color="black"), 
+        axis.text = element_text(size = rel(1), color="black"))+
+  theme(plot.title= element_text(size=rel(1), hjust = .5))
+
+```
+
+Now I'll do a 3-panelled plot, which contains Figures 3, 4, and S1 all in one plot.
+```{r plot_as_panels, fig.height=11, fig.width=12}
+# All as 1 plot
+ggplot(data = diff_plot_data, aes(x = domain, y = r, shape = source)) + 
+  geom_pointrange(aes(ymin = ci_lower, ymax = ci_upper), 
+                  position = position_dodge(width = .4),
+                  size = 1) + 
+  labs(y = "r") +
+  theme_rep_manuscript +
+  geom_hline(yintercept = 0, linetype = 2, alpha = .5) + 
+    scale_y_continuous(limit=c(-0.3, .80))+
+  coord_flip()+
+  guides(shape=guide_legend(reverse=TRUE)) +
+  facet_wrap(~parameter,
+             nrow = 3)
+```
+
+Finally, this writes out thed individual plots (Figure 3, 4, and S1) to a folder called 'plots' in the current directory.
+```{r making_plots4MS_and_ppt}
+for (each in unique(diff_plot_data$parameter)){
+  plot_data <- filter(diff_plot_data, parameter == each)
+  plot <- ggplot(data = plot_data, 
+                 aes(x = domain, y = r, shape = source)) + 
+  geom_pointrange(aes(ymin = ci_lower, ymax = ci_upper),
+                  position = position_dodge(width = .4),
+                  size = 1) + 
+  labs(title = NULL,
+       x = NULL,
+       y = "r") +
+  theme_rep_manuscript +
+  geom_hline(yintercept = 0, linetype = 2, alpha = .5) + 
+    scale_y_continuous(limit=c(-0.3, .80))+
+  coord_flip()+
+  guides(shape=guide_legend(reverse=TRUE))
+  ggsave(paste0("Plots/Study1_", print(each), ".png"), plot,
+         device = "png", height = 5, width = 9.5)
+  ggsave(paste0("Plots/Study1_", print(each), "_4ppt.png"), plot,
+         device = "png", height = 5, width = 9.5, scale = .80)
+}
+
+```
+
+## Distinctive Hearsay Accuracy
+
+### Agreeableness
+The model and results for distinctive hearsay accuracy of Agreeableness. 
+
+#### Full Model
+```{r distinctive_ha_agreeableness}
+# specify the model
+agreeableness_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_agreeableness ~ DHA*B_C_agreeableness + DDA*A_C_agreeableness
+A_A_agreeableness ~ DHA*D_A_agreeableness + DDA*C_A_agreeableness
+
+# hearsay consensus
+B_C_agreeableness ~~ HC*A_C_agreeableness
+D_A_agreeableness ~~ HC*C_A_agreeableness
+
+# variances (pooled)
+C_C_agreeableness ~~ v_self*C_C_agreeableness
+A_A_agreeableness ~~ v_self*A_A_agreeableness
+A_C_agreeableness ~~ v_P1*A_C_agreeableness
+C_A_agreeableness ~~ v_P1*C_A_agreeableness
+B_C_agreeableness ~~ v_P2*B_C_agreeableness
+D_A_agreeableness ~~ v_P2*D_A_agreeableness
+
+# intercepts (pooled)
+C_C_agreeableness ~ int_self*1
+A_A_agreeableness ~ int_self*1
+B_C_agreeableness ~ int_P1*1
+D_A_agreeableness ~ int_P1*1
+A_C_agreeableness ~ int_P2*1
+C_A_agreeableness ~ int_P2*1
+'
+# fit the model
+fit_agreeableness_distinctive_hearsay_accuracy <- 
+  sem(agreeableness_distinctive_hearsay_accuracy,
+      data = study1, 
+      # missing = FIML critical due to planned missingness
+      missing="FIML")
+
+# display results
+summary(fit_agreeableness_distinctive_hearsay_accuracy, 
+        # include standardized estimates
+        standardized=TRUE)
+```
+
+#### Table of Results
+
+Now get a table of the three main results we want:
+
+* Distinctive Hearsay Accuracy
+* Distinctive Direct Accuracy
+* Hearsay Consensus
+
+```{r table_ha_agreeableness}
+agree_ha_table <- fit_agreeableness_distinctive_hearsay_accuracy@ParTable %>% 
+  as.data.frame() %>% 
+  select(label, lhs, op, rhs) %>% 
+  left_join(standardizedsolution(fit_agreeableness_distinctive_hearsay_accuracy)) %>% 
+  filter(label == "DHA" |
+         label == "DDA" |
+         label == "HC") %>%
+  filter(duplicated(.[["label"]])) %>% 
+  mutate(
+    label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+    label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+    label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+  select(label, est.std, ci.lower, ci.upper, pvalue)
+
+knitr::kable(agree_ha_table, 
+             digits = c(NA, 2, 2, 2, 3),
+             caption = "Distinctive Hearsay Accuracy: Agreeableness") %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+### Conscientiousness
+The model and results for distinctive hearsay accuracy of Conscientiousness. 
+
+#### Full Model
+```{r distinctive_ha_conscientiousness}
+# specify the model
+conscientiousness_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_conscientiousness ~ DHA*B_C_conscientiousness + DDA*A_C_conscientiousness
+A_A_conscientiousness ~ DHA*D_A_conscientiousness + DDA*C_A_conscientiousness
+
+# hearsay consensus
+B_C_conscientiousness ~~ HC*A_C_conscientiousness
+D_A_conscientiousness ~~ HC*C_A_conscientiousness
+
+# variances (pooled)
+C_C_conscientiousness ~~ v_self*C_C_conscientiousness
+A_A_conscientiousness ~~ v_self*A_A_conscientiousness
+A_C_conscientiousness ~~ v_P1*A_C_conscientiousness
+C_A_conscientiousness ~~ v_P1*C_A_conscientiousness
+B_C_conscientiousness ~~ v_P2*B_C_conscientiousness
+D_A_conscientiousness ~~ v_P2*D_A_conscientiousness
+
+# intercepts (pooled)
+C_C_conscientiousness ~ int_self*1
+A_A_conscientiousness ~ int_self*1
+B_C_conscientiousness ~ int_P1*1
+D_A_conscientiousness ~ int_P1*1
+A_C_conscientiousness ~ int_P2*1
+C_A_conscientiousness ~ int_P2*1
+'
+# fit the model
+fit_conscientiousness_distinctive_hearsay_accuracy <- 
+  sem(conscientiousness_distinctive_hearsay_accuracy,
+      data=study1, 
+      # missing = FIML critical due to planned missingness
+      missing="FIML")
+
+# display results
+summary(fit_conscientiousness_distinctive_hearsay_accuracy, 
+        # include standardized estimates
+        standardized=TRUE)
+```
+
+
+#### Table of Results
+
+Now get a table of the three main results we want:
+
+* Distinctive Hearsay Accuracy
+* Distinctive Direct Accuracy
+* Hearsay Consensus
+
+```{r table_ha_conscientiousness}
+consc_ha_table <- fit_conscientiousness_distinctive_hearsay_accuracy@ParTable %>% 
+  as.data.frame() %>% 
+  select(label, lhs, op, rhs) %>% 
+  left_join(standardizedsolution(fit_conscientiousness_distinctive_hearsay_accuracy)) %>% 
+  filter(label == "DHA" |
+         label == "DDA" |
+         label == "HC") %>%
+  filter(duplicated(.[["label"]])) %>% 
+  mutate(
+    label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+    label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+    label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+  select(label, est.std, ci.lower, ci.upper, pvalue)
+
+knitr::kable(consc_ha_table, 
+             digits = c(NA, 2, 2, 2, 3),
+             caption = "Distinctive Hearsay Accuracy: Conscientiousness") %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+### HP
+The model and results for distinctive hearsay accuracy of HP. 
+
+#### Full Model
+```{r distinctive_ha_hp}
+# specify the model
+hp_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_hp ~ DHA*B_C_hp + DDA*A_C_hp
+A_A_hp ~ DHA*D_A_hp + DDA*C_A_hp
+
+# hearsay consensus
+B_C_hp ~~ HC*A_C_hp
+D_A_hp ~~ HC*C_A_hp
+
+# variances (pooled)
+C_C_hp ~~ v_self*C_C_hp
+A_A_hp ~~ v_self*A_A_hp
+A_C_hp ~~ v_P1*A_C_hp
+C_A_hp ~~ v_P1*C_A_hp
+B_C_hp ~~ v_P2*B_C_hp
+D_A_hp ~~ v_P2*D_A_hp
+
+# intercepts (pooled)
+C_C_hp ~ int_self*1
+A_A_hp ~ int_self*1
+B_C_hp ~ int_P1*1
+D_A_hp ~ int_P1*1
+A_C_hp ~ int_P2*1
+C_A_hp ~ int_P2*1
+'
+# fit the model
+fit_hp_distinctive_hearsay_accuracy <- 
+  sem(hp_distinctive_hearsay_accuracy,
+      data=study1, 
+      # missing = FIML critical due to planned missingness
+      missing="FIML")
+
+# display results
+summary(fit_hp_distinctive_hearsay_accuracy, 
+        # include standardized estimates
+        standardized=TRUE)
+```
+
+
+#### Table of Results
+
+Now get a table of the three main results we want:
+
+* Distinctive Hearsay Accuracy
+* Distinctive Direct Accuracy
+* Hearsay Consensus
+
+
+```{r table_ha_hp}
+hp_ha_table <- fit_hp_distinctive_hearsay_accuracy@ParTable %>% 
+  as.data.frame() %>% 
+  select(label, lhs, op, rhs) %>% 
+  left_join(standardizedsolution(fit_hp_distinctive_hearsay_accuracy)) %>% 
+  filter(label == "DHA" |
+         label == "DDA" |
+         label == "HC") %>%
+  filter(duplicated(.[["label"]])) %>% 
+  mutate(
+    label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+    label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+    label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+  select(label, est.std, ci.lower, ci.upper, pvalue)
+
+knitr::kable(hp_ha_table,
+             digits = c(NA, 2, 2, 2, 3),
+             caption = "Distinctive Hearsay Accuracy: HP") %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+
+### Neuroticism
+The model and results for distinctive hearsay accuracy of Neuroticism. 
+
+#### Full Model
+```{r distinctive_ha_neuroticism}
+# specify the model
+neuroticism_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_neuroticism ~ DHA*B_C_neuroticism + DDA*A_C_neuroticism
+A_A_neuroticism ~ DHA*D_A_neuroticism + DDA*C_A_neuroticism
+
+# hearsay consensus
+B_C_neuroticism ~~ HC*A_C_neuroticism
+D_A_neuroticism ~~ HC*C_A_neuroticism
+
+# variances (pooled)
+C_C_neuroticism ~~ v_self*C_C_neuroticism
+A_A_neuroticism ~~ v_self*A_A_neuroticism
+A_C_neuroticism ~~ v_P1*A_C_neuroticism
+C_A_neuroticism ~~ v_P1*C_A_neuroticism
+B_C_neuroticism ~~ v_P2*B_C_neuroticism
+D_A_neuroticism ~~ v_P2*D_A_neuroticism
+
+# intercepts (pooled)
+C_C_neuroticism ~ int_self*1
+A_A_neuroticism ~ int_self*1
+B_C_neuroticism ~ int_P1*1
+D_A_neuroticism ~ int_P1*1
+A_C_neuroticism ~ int_P2*1
+C_A_neuroticism ~ int_P2*1
+'
+# fit the model
+fit_neuroticism_distinctive_hearsay_accuracy <- 
+  sem(neuroticism_distinctive_hearsay_accuracy,
+      data=study1, 
+      # missing = FIML critical due to planned missingness
+      missing="FIML")
+
+# display results
+summary(fit_neuroticism_distinctive_hearsay_accuracy, 
+        # include standardized estimates
+        standardized=TRUE)
+```
+
+#### Table of Results
+
+Now get a table of the three main results we want:
+
+* Distinctive Hearsay Accuracy
+* Distinctive Direct Accuracy
+* Hearsay Consensus
+
+```{r table_ha_neuroticism}
+neur_ha_table <- fit_neuroticism_distinctive_hearsay_accuracy@ParTable %>% 
+  as.data.frame() %>% 
+  select(label, lhs, op, rhs) %>% 
+  left_join(standardizedsolution(fit_neuroticism_distinctive_hearsay_accuracy)) %>% 
+  filter(label == "DHA" |
+         label == "DDA" |
+         label == "HC") %>%
+  filter(duplicated(.[["label"]])) %>% 
+  mutate(
+    label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+    label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+    label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+  select(label, est.std, ci.lower, ci.upper, pvalue)
+
+knitr::kable(neur_ha_table,
+             digits = c(NA, 2, 2, 2, 3),
+             caption = "Distinctive Hearsay Accuracy: Neuroticism") %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+### Extraversion
+The model and results for distinctive hearsay accuracy of Extraversion. 
+
+#### Full Model
+```{r distinctive_ha_extraversion}
+# specify the model
+extraversion_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_extraversion ~ DHA*B_C_extraversion + DDA*A_C_extraversion
+A_A_extraversion ~ DHA*D_A_extraversion + DDA*C_A_extraversion
+
+# hearsay consensus
+B_C_extraversion ~~ HC*A_C_extraversion
+D_A_extraversion ~~ HC*C_A_extraversion
+
+# variances (pooled)
+C_C_extraversion ~~ v_self*C_C_extraversion
+A_A_extraversion ~~ v_self*A_A_extraversion
+A_C_extraversion ~~ v_P1*A_C_extraversion
+C_A_extraversion ~~ v_P1*C_A_extraversion
+B_C_extraversion ~~ v_P2*B_C_extraversion
+D_A_extraversion ~~ v_P2*D_A_extraversion
+
+# intercepts (pooled)
+C_C_extraversion ~ int_self*1
+A_A_extraversion ~ int_self*1
+B_C_extraversion ~ int_P1*1
+D_A_extraversion ~ int_P1*1
+A_C_extraversion ~ int_P2*1
+C_A_extraversion ~ int_P2*1
+'
+# fit the model
+fit_extraversion_distinctive_hearsay_accuracy <- 
+  sem(extraversion_distinctive_hearsay_accuracy,
+      data=study1, 
+      # missing = FIML critical due to planned missingness
+      missing="FIML")
+
+# display results
+summary(fit_extraversion_distinctive_hearsay_accuracy, 
+        # include standardized estimates
+        standardized=TRUE)
+```
+
+#### Table of Results
+
+Now get a table of the three main results we want:
+
+* Distinctive Hearsay Accuracy
+* Distinctive Direct Accuracy
+* Hearsay Consensus
+
+```{r table_ha_extraversion}
+extra_ha_table <- fit_extraversion_distinctive_hearsay_accuracy@ParTable %>% 
+  as.data.frame() %>% 
+  select(label, lhs, op, rhs) %>% 
+  left_join(standardizedsolution(fit_extraversion_distinctive_hearsay_accuracy)) %>% 
+  filter(label == "DHA" |
+         label == "DDA" |
+         label == "HC") %>%
+  filter(duplicated(.[["label"]])) %>% 
+  mutate(
+    label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+    label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+    label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+  select(label, est.std, ci.lower, ci.upper, pvalue) 
+
+knitr::kable(extra_ha_table,
+             digits = c(NA, 2, 2, 2, 3),
+             caption = "Distinctive Hearsay Accuracy: Extraversion") %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+
+### Openness
+The model and results for distinctive hearsay accuracy of Openness. 
+
+#### Full Model
+
+```{r distinctive_ha_openness}
+# specify the model
+openness_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_openness ~ DHA*B_C_openness + DDA*A_C_openness
+A_A_openness ~ DHA*D_A_openness + DDA*C_A_openness
+
+# hearsay consensus
+B_C_openness ~~ HC*A_C_openness
+D_A_openness ~~ HC*C_A_openness
+
+# variances (pooled)
+C_C_openness ~~ v_self*C_C_openness
+A_A_openness ~~ v_self*A_A_openness
+A_C_openness ~~ v_P1*A_C_openness
+C_A_openness ~~ v_P1*C_A_openness
+B_C_openness ~~ v_P2*B_C_openness
+D_A_openness ~~ v_P2*D_A_openness
+
+# intercepts (pooled)
+C_C_openness ~ int_self*1
+A_A_openness ~ int_self*1
+B_C_openness ~ int_P1*1
+D_A_openness ~ int_P1*1
+A_C_openness ~ int_P2*1
+C_A_openness ~ int_P2*1
+'
+# fit the model
+fit_openness_distinctive_hearsay_accuracy <- 
+  sem(openness_distinctive_hearsay_accuracy,
+      data=study1, 
+      # missing = FIML critical due to planned missingness
+      missing="FIML")
+
+# display results
+summary(fit_openness_distinctive_hearsay_accuracy, 
+        # include standardized estimates
+        standardized=TRUE)
+```
+
+#### Table of Results
+
+Now get a table of the three main results we want:
+
+* Distinctive Hearsay Accuracy
+* Distinctive Direct Accuracy
+* Hearsay Consensus
+
+
+```{r table_ha_open}
+open_ha_table <- fit_openness_distinctive_hearsay_accuracy@ParTable %>% 
+  as.data.frame() %>% 
+  select(label, lhs, op, rhs) %>% 
+  left_join(standardizedsolution(fit_openness_distinctive_hearsay_accuracy)) %>% 
+  filter(label == "DHA" |
+         label == "DDA" |
+         label == "HC") %>%
+  filter(duplicated(.[["label"]])) %>% 
+  mutate(
+    label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+    label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+    label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+  select(label, est.std, ci.lower, ci.upper, pvalue)
+
+knitr::kable(open_ha_table, digits = c(NA, 2, 2, 2, 3),
+               caption = "Distinctive Hearsay Accuracy: Openness") %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+### Table of All Big Six together
+
+And finally a table of all of the results together. This is akin to Table 2 in the manuscript, but is organized a bit differently.
+```{r table_ha_all}
+agree_ha_table$domain = "Agreeableness"
+consc_ha_table$domain = "Conscientiousness"
+hp_ha_table$domain = "Honesty-Propriety"
+neur_ha_table$domain = "Neuroticism"
+extra_ha_table$domain = "Extraversion"
+open_ha_table$domain = "Openness"
+
+agree_ha_table %>% 
+  full_join(consc_ha_table) %>% 
+  full_join(hp_ha_table) %>% 
+  full_join(neur_ha_table) %>% 
+  full_join(extra_ha_table) %>% 
+  full_join(open_ha_table) %>% 
+  select(domain, label, est.std, ci.lower, ci.upper, pvalue) %>% 
+  knitr::kable(digits = c(NA, NA, 2, 2, 2, 3),
+               caption = "Distinctive Hearsay Accuracy: All Big Six") %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+## Individual Difference Moderator Data Prep
+Next up are the individual difference moderators. These analyses require first mean-centering predictors and creating interaction terms, which the next chunk of code does. 
+```{r prep_data}
+study1 <-
+study1 %>%
+  # First, mean center the predictors, 
+  # since this is a continuous by continuous interaction.
+  # We'll do this scale()
+  mutate(
+    # first, mean center P2 ratings for each domain
+    B_C_extraversion_cent      = scale(B_C_extraversion, scale = FALSE),
+    D_A_extraversion_cent      = scale(D_A_extraversion, scale = FALSE),
+    B_C_agreeableness_cent     = scale(B_C_agreeableness, scale = FALSE),
+    D_A_agreeableness_cent     = scale(D_A_agreeableness, scale = FALSE),
+    B_C_conscientiousness_cent = scale(B_C_conscientiousness, scale = FALSE),
+    D_A_conscientiousness_cent = scale(D_A_conscientiousness, scale = FALSE),
+    B_C_neuroticism_cent       = scale(B_C_neuroticism, scale = FALSE),
+    D_A_neuroticism_cent       = scale(D_A_neuroticism, scale = FALSE),
+    B_C_openness_cent          = scale(B_C_openness, scale = FALSE),
+    D_A_openness_cent          = scale(D_A_openness, scale = FALSE),
+    B_C_hp_cent                = scale(B_C_hp, scale = FALSE),
+    D_A_hp_cent                = scale(D_A_hp, scale = FALSE),
+    # next, mean center empathy subscales (only have B and D for this)
+    # this is a proposed moderator of consensus/accuracy
+    B_iri_perspective_cent     = scale(B_iri_perspective, scale = FALSE),
+    D_iri_perspective_cent     = scale(D_iri_perspective, scale = FALSE),
+    B_iri_empathic_cent        = scale(B_iri_empathic, scale = FALSE),
+    D_iri_empathic_cent        = scale(D_iri_empathic, scale = FALSE),
+    B_iri_distress_cent        = scale(B_iri_distress, scale = FALSE),
+    D_iri_distress_cent        = scale(D_iri_distress, scale = FALSE),
+    B_iri_fantasy_cent         = scale(B_iri_fantasy, scale = FALSE),
+    D_iri_fantasy_cent         = scale(D_iri_fantasy, scale = FALSE),
+    # mean center self-reported extraversion
+    # this is a proposed moderator of consensus/accuracy
+    A_A_extraversion_cent      = scale(A_A_extraversion, scale = FALSE),
+    C_C_extraversion_cent      = scale(C_C_extraversion, scale = FALSE),
+    A_C_extraversion_cent      = scale(A_C_extraversion, scale = FALSE),
+    C_A_extraversion_cent      = scale(C_A_extraversion, scale = FALSE),
+    B_B_extraversion_cent      = scale(B_B_extraversion, scale = FALSE),
+    D_D_extraversion_cent      = scale(D_D_extraversion, scale = FALSE)) %>% 
+  # Next, create interaction terms
+  mutate(
+    # Extraversion moderators (for extraversion)
+    extraXextra_AB = A_A_extraversion_cent*B_C_extraversion_cent,
+    extraXextra_CD = C_C_extraversion_cent*D_A_extraversion_cent,
+    extraXextra_BB = B_B_extraversion_cent*B_C_extraversion_cent,
+    extraXextra_DD = D_D_extraversion_cent*D_A_extraversion_cent,
+    extraXextra_CB = C_C_extraversion_cent*B_C_extraversion_cent,
+    extraXextra_AD = A_A_extraversion_cent*D_A_extraversion_cent,
+    # Extraversion moderators (for agreeableness)
+    extraXagree_AB = A_A_extraversion_cent*B_C_agreeableness_cent,
+    extraXagree_CD = C_C_extraversion_cent*D_A_agreeableness_cent,
+    extraXagree_BB = B_B_extraversion_cent*B_C_agreeableness_cent,
+    extraXagree_DD = D_D_extraversion_cent*D_A_agreeableness_cent,
+    extraXagree_CB = C_C_extraversion_cent*B_C_agreeableness_cent,
+    extraXagree_AD = A_A_extraversion_cent*D_A_agreeableness_cent,
+    # Extraversion moderators (for conscientiousness)
+    extraXconsc_AB = A_A_extraversion_cent*B_C_conscientiousness_cent,
+    extraXconsc_CD = C_C_extraversion_cent*D_A_conscientiousness_cent,
+    extraXconsc_BB = B_B_extraversion_cent*B_C_conscientiousness_cent,
+    extraXconsc_DD = D_D_extraversion_cent*D_A_conscientiousness_cent,
+    extraXconsc_CB = C_C_extraversion_cent*B_C_conscientiousness_cent,
+    extraXconsc_AD = A_A_extraversion_cent*D_A_conscientiousness_cent,
+    # Extraversion moderators (for Neuroticism)
+    extraXneuro_AB = A_A_extraversion_cent*B_C_neuroticism_cent,
+    extraXneuro_CD = C_C_extraversion_cent*D_A_neuroticism_cent,
+    extraXneuro_BB = B_B_extraversion_cent*B_C_neuroticism_cent,
+    extraXneuro_DD = D_D_extraversion_cent*D_A_neuroticism_cent,
+    extraXneuro_CB = C_C_extraversion_cent*B_C_neuroticism_cent,
+    extraXneuro_AD = A_A_extraversion_cent*D_A_neuroticism_cent,
+    # Extraversion moderators (for Openness)
+    extraXopen_AB = A_A_extraversion_cent*B_C_openness_cent,
+    extraXopen_CD = C_C_extraversion_cent*D_A_openness_cent,
+    extraXopen_BB = B_B_extraversion_cent*B_C_openness_cent,
+    extraXopen_DD = D_D_extraversion_cent*D_A_openness_cent,
+    extraXopen_CB = C_C_extraversion_cent*B_C_openness_cent,
+    extraXopen_AD = A_A_extraversion_cent*D_A_openness_cent,
+    # Extraversion moderators (for HP)
+    extraXhp_AB = A_A_extraversion_cent*B_C_hp_cent,
+    extraXhp_CD = C_C_extraversion_cent*D_A_hp_cent,
+    extraXhp_BB = B_B_extraversion_cent*B_C_hp_cent,
+    extraXhp_DD = D_D_extraversion_cent*D_A_hp_cent,
+    extraXhp_CB = C_C_extraversion_cent*B_C_hp_cent,
+    extraXhp_AD = A_A_extraversion_cent*D_A_hp_cent,
+    # perspective taking moderators (for extraversion)
+    PTxE_B = B_iri_perspective_cent*B_C_extraversion_cent,
+    PTxE_D = D_iri_perspective_cent*D_A_extraversion_cent,
+    # perspective taking moderators (for agreeableness)
+    PTxA_B = B_iri_perspective_cent*B_C_agreeableness_cent,
+    PTxA_D = D_iri_perspective_cent*D_A_agreeableness_cent,
+    # perspective taking moderators (for conscientiousness)
+    PTxC_B = B_iri_perspective_cent*B_C_conscientiousness_cent,
+    PTxC_D = D_iri_perspective_cent*D_A_conscientiousness_cent,
+    # perspective taking moderators (for neuroticism)
+    PTxN_B = B_iri_perspective_cent*B_C_neuroticism_cent,
+    PTxN_D = D_iri_perspective_cent*D_A_neuroticism_cent,
+    # perspective taking moderators (for openness)
+    PTxO_B = B_iri_perspective_cent*B_C_openness_cent,
+    PTxO_D = D_iri_perspective_cent*D_A_openness_cent,
+    # perspective taking moderators (for hp)
+    PTxHP_B = B_iri_perspective_cent*B_C_hp_cent,
+    PTxHP_D = D_iri_perspective_cent*D_A_hp_cent,
+    # empathic concern moderators (for extraversion)
+    empxE_B = B_iri_empathic_cent*B_C_extraversion_cent,
+    empxE_D = D_iri_empathic_cent*D_A_extraversion_cent,
+    # empathic concern moderators (for agreeableness)
+    empxA_B = B_iri_empathic_cent*B_C_agreeableness_cent,
+    empxA_D = D_iri_empathic_cent*D_A_agreeableness_cent,
+    # empathic concern moderators (for conscientiousness)
+    empxC_B = B_iri_empathic_cent*B_C_conscientiousness_cent,
+    empxC_D = D_iri_empathic_cent*D_A_conscientiousness_cent,
+    # empathic concern moderators (for neuroticism)
+    empxN_B = B_iri_empathic_cent*B_C_neuroticism_cent,
+    empxN_D = D_iri_empathic_cent*D_A_neuroticism_cent,
+    # empathic concern moderators (for openness)
+    empxO_B = B_iri_empathic_cent*B_C_openness_cent,
+    empxO_D = D_iri_empathic_cent*D_A_openness_cent,
+    # empathic concern moderators (for hp)
+    empxHP_B = B_iri_empathic_cent*B_C_hp_cent,
+    empxHP_D = D_iri_empathic_cent*D_A_hp_cent,
+    # personal distress moderators (for extraversion)
+    disxE_B = B_iri_distress_cent*B_C_extraversion_cent,
+    disxE_D = D_iri_distress_cent*D_A_extraversion_cent,
+    # personal distress moderators (for agreeableness)
+    disxA_B = B_iri_distress_cent*B_C_agreeableness_cent,
+    disxA_D = D_iri_distress_cent*D_A_agreeableness_cent,
+    # personal distress moderators (for conscientiousness)
+    disxC_B = B_iri_distress_cent*B_C_conscientiousness_cent,
+    disxC_D = D_iri_distress_cent*D_A_conscientiousness_cent,
+    # personal distress moderators (for neuroticism)
+    disxN_B = B_iri_distress_cent*B_C_neuroticism_cent,
+    disxN_D = D_iri_distress_cent*D_A_neuroticism_cent,
+    # personal distress moderators (for openness)
+    disxO_B = B_iri_distress_cent*B_C_openness_cent,
+    disxO_D = D_iri_distress_cent*D_A_openness_cent,
+    # personal distress moderators (for hp)
+    disxHP_B = B_iri_distress_cent*B_C_hp_cent,
+    disxHP_D = D_iri_distress_cent*D_A_hp_cent,
+    # fantasy moderators (for extraversion)
+    fantxE_B = B_iri_fantasy_cent*B_C_extraversion_cent,
+    fantxE_D = D_iri_fantasy_cent*D_A_extraversion_cent,
+    # fantasy moderators (for agreeableness)
+    fantxA_B = B_iri_fantasy_cent*B_C_agreeableness_cent,
+    fantxA_D = D_iri_fantasy_cent*D_A_agreeableness_cent,
+    # fantasy moderators (for conscientiousness)
+    fantxC_B = B_iri_fantasy_cent*B_C_conscientiousness_cent,
+    fantxC_D = D_iri_fantasy_cent*D_A_conscientiousness_cent,
+    # fantasy moderators (for neuroticism)
+    fantxN_B = B_iri_fantasy_cent*B_C_neuroticism_cent,
+    fantxN_D = D_iri_fantasy_cent*D_A_neuroticism_cent,
+    # fantasy moderators (for openness)
+    fantxO_B = B_iri_fantasy_cent*B_C_openness_cent,
+    fantxO_D = D_iri_fantasy_cent*D_A_openness_cent,
+    # fantasy moderators (for hp)
+    fantxHP_B = B_iri_fantasy_cent*B_C_hp_cent,
+    fantxHP_D = D_iri_fantasy_cent*D_A_hp_cent)
+```
+## Extraversion Moderating Hearsay Consensus
+
+I'll start with Extraversion moderating hearsay consensus, which predicts P1 reports from P2 reports, (Target, P1, and P2 ) self-reported Extraversion, and their interaction.
+
+### Target Extraversion
+
+Starting with targets' self-reported Extraversion moderating hearsay consensus for each of the Big Six.
+
+#### Agreeableness
+```{r Text_mod_hc_agree}
+agreeableness_Textmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_agreeableness", 
+                                     "C_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXagree_CB", 
+                                           "extraXagree_AD"))
+summary(agreeableness_Textmod_hc, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r Text_mod_hc_consc}
+conscientiousness_Textmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_conscientiousness", 
+                                     "C_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXconsc_CB", 
+                                           "extraXconsc_AD"))
+summary(conscientiousness_Textmod_hc, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r Text_mod_hc_hp}
+hp_Textmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_hp", 
+                                     "C_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXhp_CB", 
+                                           "extraXhp_AD"))
+summary(hp_Textmod_hc, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r Text_mod_hc_neuro}
+neuroticism_Textmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_neuroticism", 
+                                     "C_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXneuro_CB", 
+                                           "extraXneuro_AD"))
+summary(neuroticism_Textmod_hc, standardized = TRUE)
+```
+
+#### Extraversion
+```{r Text_mod_hc_extra}
+extraversion_Textmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_extraversion", 
+                                     "C_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXextra_CB", 
+                                           "extraXextra_AD"))
+summary(extraversion_Textmod_hc, standardized = TRUE)
+```
+
+#### Openness
+```{r Text_mod_hc_open}
+openness_Textmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_openness", 
+                                     "C_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXopen_CB", 
+                                           "extraXopen_AD"))
+summary(openness_Textmod_hc, standardized = TRUE)
+```
+
+
+### P1 Extraversion
+
+Next up, P1s' self-reported Extraversion moderating hearsay consensus for each of the Big Six.
+
+#### Agreeableness
+```{r P1ext_mod_hc_agree}
+agreeableness_P1extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_agreeableness", 
+                                     "C_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXagree_AB", 
+                                           "extraXagree_CD"))
+summary(agreeableness_P1extmod_hc, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r P1ext_mod_hc_consc}
+conscientiousness_P1extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_conscientiousness", 
+                                     "C_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXconsc_AB", 
+                                           "extraXconsc_CD"))
+summary(conscientiousness_P1extmod_hc, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r P1ext_mod_hc_hp}
+hp_P1extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_hp", 
+                                     "C_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXhp_AB", 
+                                           "extraXhp_CD"))
+summary(hp_P1extmod_hc, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r P1ext_mod_hc_neuro}
+neuroticism_P1extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_neuroticism", 
+                                     "C_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXneuro_AB", 
+                                           "extraXneuro_CD"))
+summary(neuroticism_P1extmod_hc, standardized = TRUE)
+```
+
+#### Extraversion
+```{r P1ext_mod_hc_extra}
+extraversion_P1extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_extraversion", 
+                                     "C_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXextra_AB", 
+                                           "extraXextra_CD"))
+summary(extraversion_P1extmod_hc, standardized = TRUE)
+```
+
+#### Openness
+```{r P1ext_mod_hc_open}
+openness_P1extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_openness", 
+                                     "C_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXopen_AB", 
+                                           "extraXopen_CD"))
+summary(openness_P1extmod_hc, standardized = TRUE)
+```
+
+### P2 Extraversion
+
+Next, P2s' self-reported Extraversion moderating hearsay consensus for each of the Big Six.
+
+#### Agreeableness
+```{r P2ext_mod_hc_agree}
+agreeableness_P2extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_agreeableness", 
+                                     "C_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXagree_BB", 
+                                           "extraXagree_DD"))
+summary(agreeableness_P2extmod_hc, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r P2ext_mod_hc_consc}
+conscientiousness_P2extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_conscientiousness", 
+                                     "C_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXconsc_BB", 
+                                           "extraXconsc_DD"))
+summary(conscientiousness_P2extmod_hc, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r P2ext_mod_hc_hp}
+hp_P2extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_hp", 
+                                     "C_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXhp_BB", 
+                                           "extraXhp_DD"))
+summary(hp_P2extmod_hc, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r P2ext_mod_hc_neuro}
+neuroticism_P2extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_neuroticism", 
+                                     "C_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXneuro_BB", 
+                                           "extraXneuro_DD"))
+summary(neuroticism_P2extmod_hc, standardized = TRUE)
+```
+
+#### Extraversion
+```{r P2ext_mod_hc_extra}
+extraversion_P2extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_extraversion", 
+                                     "C_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXextra_BB", 
+                                           "extraXextra_DD"))
+summary(extraversion_P2extmod_hc, standardized = TRUE)
+```
+
+#### Openness
+```{r P2ext_mod_hc_open}
+openness_P2extmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_openness", 
+                                     "C_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXopen_BB", 
+                                           "extraXopen_DD"))
+summary(openness_P2extmod_hc, standardized = TRUE)
+```
+
+### Table of Extraversion Moderating Hearsay Consensus (Table S4)
+First, search the environment for all of the objects ending in _hc, which is how all of the  Extraversion moderating Heaesay Consensus models end.
+
+```{r extra_mod_hc_tbl}
+extra_mod_hc <- ls() %>% 
+  .[str_detect(., "_hc$")]
+
+extra_mod_hc %>% 
+  map(get) %>%
+  map_df(ez_id_mod_table) %>% 
+  cbind(domain = rep(as.character(str_extract_all(extra_mod_hc, "^[:alpha:]*")), each = 3)) %>% 
+  mutate(moderator = rep(str_extract(extra_mod_hc, "_[:alnum:]*"), each = 3),
+         moderator = str_remove_all(moderator, "_"),
+         moderator = str_remove_all(moderator, "extmod"),
+  moderator = paste(moderator, "Extraversion"),
+  moderator = fct_relevel(moderator,
+                          "T Extraversion",
+                          "P1 Extraversion",
+                          "P2 Extraversion"),
+  domain = fct_relevel(domain,
+                       "agreeableness",
+                       "conscientiousness",
+                       "hp",
+                       "neuroticism",
+                       "extraversion",
+                       "openness"),
+  pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), 
+                                             "0.", "."), 4, 
+                                 side = "right", pad ="0"),  
+                         "< .001")) %>% 
+  filter(parameter == "interaction effect") %>% 
+  select(moderator, domain, everything(), -parameter) %>% 
+  arrange(moderator, domain) %>% 
+  knitr::kable(caption = "Extraversion Moderating Hearsay Consensus (akin to Table S4)",
+               digits = c(NA, NA, 2, 2, 2, NA)) %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+## Extraversion Moderating Hearsay Accuracy
+
+Next up: Extraversion moderating hearsay accuracy. These models are almost identical to the one's above, but instead have targets' self-reports as the outcome variable in the regression equations. 
+
+### Target Extraversion
+Starting with target Extraversion moderating hearsay accuracy for each of the Big Six. 
+
+#### Agreeableness
+```{r Text_mod_ha_agree}
+agreeableness_Textmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_agreeableness", 
+                                     "A_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXagree_CB", 
+                                           "extraXagree_AD"))
+summary(agreeableness_Textmod_ha, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r Text_mod_ha_consc}
+conscientiousness_Textmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_conscientiousness", 
+                                     "A_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXconsc_CB", 
+                                           "extraXconsc_AD"))
+summary(conscientiousness_Textmod_ha, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r Text_mod_ha_hp}
+hp_Textmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_hp", 
+                                     "A_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXhp_CB", 
+                                           "extraXhp_AD"))
+summary(hp_Textmod_ha, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r Text_mod_ha_neuro}
+neuroticism_Textmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_neuroticism", 
+                                     "A_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXneuro_CB", 
+                                           "extraXneuro_AD"))
+summary(neuroticism_Textmod_ha, standardized = TRUE)
+```
+
+#### Extraversion
+Extraversion is not possible, as it would be a predictor and outcome in the same equation.
+
+#### Openness
+```{r Text_mod_ha_open}
+openness_Textmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_openness", 
+                                     "A_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("C_C_extraversion_cent",
+                                          "A_A_extraversion_cent"),
+                      interaction_term = c("extraXopen_CB", 
+                                           "extraXopen_AD"))
+summary(openness_Textmod_ha, standardized = TRUE)
+```
+
+
+### P1 Extraversion
+Next up: P1 self-reported Extraversion moderating hearsay accuracy for each of the Big Six.
+#### Agreeableness
+```{r P1ext_mod_ha_agree}
+agreeableness_P1extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_agreeableness", 
+                                     "A_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXagree_AB", 
+                                           "extraXagree_CD"))
+summary(agreeableness_P1extmod_ha, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r P1ext_mod_ha_consc}
+conscientiousness_P1extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_conscientiousness", 
+                                     "A_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXconsc_AB", 
+                                           "extraXconsc_CD"))
+summary(conscientiousness_P1extmod_ha, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r P1ext_mod_ha_hp}
+hp_P1extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_hp", 
+                                     "A_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXhp_AB", 
+                                           "extraXhp_CD"))
+summary(hp_P1extmod_ha, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r P1ext_mod_ha_neuro}
+neuroticism_P1extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_neuroticism", 
+                                     "A_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXneuro_AB", 
+                                           "extraXneuro_CD"))
+summary(neuroticism_P1extmod_ha, standardized = TRUE)
+```
+
+#### Extraversion
+P1 Extraversion moderating hearsay accuracy is a little different than the others and doesn't work well with the individual difference moderator function, because targets' self-reported extraversion is an outcome in one equation (as the accuracy criterion for Extraversion) and a predictor in the other (as P1s' Extraversion). That one needs to be written 'by hand' and passed to `Lavaan`.
+```{r P1ext_mod_ha_extra}
+extraversion_P1extmod_ha <- '
+C_C_extraversion_cent ~ ha_me*B_C_extraversion_cent + mod_me*A_A_extraversion_cent + interaction*extraXextra_AB
+A_A_extraversion_cent ~ ha_me*D_A_extraversion_cent + mod_me*C_C_extraversion_cent + interaction*extraXextra_CD
+
+C_C_extraversion_cent ~ int_se*1
+A_A_extraversion_cent ~ int_se*1
+B_C_extraversion_cent ~ int_p2*1
+D_A_extraversion_cent ~ int_p2*1
+C_C_extraversion ~ int_se2*1
+A_A_extraversion ~ int_se2*1
+extraXextra_AB ~ int_mod*1
+extraXextra_CD ~ int_mod*1
+
+B_C_extraversion_cent ~~ v_p2*B_C_extraversion_cent
+D_A_extraversion_cent ~~ v_p2*D_A_extraversion_cent
+
+A_A_extraversion_cent ~~ v_se*A_A_extraversion_cent
+C_C_extraversion_cent ~~ v_se*C_C_extraversion_cent
+
+extraXextra_AB ~~ v_mod*extraXextra_AB
+extraXextra_CD ~~ v_mod*extraXextra_CD
+'
+
+extraversion_P1extmod_ha  <- sem(extraversion_P1extmod_ha, 
+                                  data = study1, 
+                                  missing="FIML", fixed.x = FALSE)
+summary(extraversion_P1extmod_ha, standardized=TRUE)
+```
+
+#### Openness
+```{r P1ext_mod_ha_open}
+openness_P1extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_openness", 
+                                     "A_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("A_A_extraversion_cent",
+                                          "C_C_extraversion_cent"),
+                      interaction_term = c("extraXopen_AB", 
+                                           "extraXopen_CD"))
+summary(openness_P1extmod_ha, standardized = TRUE)
+```
+
+### P2 Extraversion
+Next: P2 self-reported Extraversion moderating hearsay accuracy for each of the Big Six.
+#### Agreeableness
+```{r P2ext_mod_ha_agree}
+agreeableness_P2extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_agreeableness", 
+                                     "A_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXagree_BB", 
+                                           "extraXagree_DD"))
+summary(agreeableness_P2extmod_ha, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r P2ext_mod_ha_consc}
+conscientiousness_P2extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_conscientiousness", 
+                                     "A_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXconsc_BB", 
+                                           "extraXconsc_DD"))
+summary(conscientiousness_P2extmod_ha, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r P2ext_mod_ha_hp}
+hp_P2extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_hp", 
+                                     "A_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXhp_BB", 
+                                           "extraXhp_DD"))
+summary(hp_P2extmod_ha, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r P2ext_mod_ha_neuro}
+neuroticism_P2extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_neuroticism", 
+                                     "A_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXneuro_BB", 
+                                           "extraXneuro_DD"))
+summary(neuroticism_P2extmod_ha, standardized = TRUE)
+```
+
+#### Extraversion
+```{r P2ext_mod_ha_extra}
+extraversion_P2extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_extraversion", 
+                                     "A_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXextra_BB", 
+                                           "extraXextra_DD"))
+summary(extraversion_P2extmod_ha, standardized = TRUE)
+```
+
+#### Openness
+```{r P2ext_mod_ha_open}
+openness_P2extmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_openness", 
+                                     "A_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_B_extraversion_cent",
+                                          "D_D_extraversion_cent"),
+                      interaction_term = c("extraXopen_BB", 
+                                           "extraXopen_DD"))
+summary(openness_P2extmod_ha, standardized = TRUE)
+```
+### Table of Extraversion Moderating Hearsay Accuracy
+```{r extraversion_mod_hearacc_tbl}
+extra_mod_ha <- ls() %>% 
+  .[str_detect(., "_ha$")]
+
+extra_mod_ha %>% 
+  map(get) %>% 
+  map_df(ez_id_mod_table) %>%
+  cbind(domain = rep(as.character(str_extract_all(extra_mod_ha, "^[:alpha:]*")), 
+                     each = 3)) %>% 
+  mutate(moderator = rep(str_extract(extra_mod_ha, "_[:alnum:]*"), each = 3),
+         moderator = str_remove_all(moderator, "_"),
+         moderator = str_remove_all(moderator, "extmod"),
+  moderator = paste(moderator, "Extraversion"),
+  moderator = fct_relevel(moderator,
+                          "T Extraversion",
+                          "P1 Extraversion",
+                          "P2 Extraversion"),
+  domain = fct_relevel(domain,
+                       "agreeableness",
+                       "conscientiousness",
+                       "hp",
+                       "neuroticism",
+                       "extraversion",
+                       "openness"),
+  pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), 
+                                             "0.", "."), 4, 
+                                 side = "right", pad ="0"),  
+                         "< .001")) %>% 
+  filter(parameter == "interaction effect") %>% 
+  select(moderator, domain, everything(), -parameter) %>% 
+  arrange(moderator, domain) %>% 
+  knitr::kable(caption = "Extraversion Moderating Hearsay Accuracy (akin to Table S5)",
+               digits = c(NA, NA, 2, 2, 2, NA)) %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+
+## Empathy Moderating Hearsay Consensus
+
+Next up: P2s' self-reported Empathy (as assessed by the IRI; Davis, 1980) moderating hearsay consensus for each of the Big Six.
+
+### Perspective Taking
+Starting with perspective taking.
+#### Agreeableness
+```{r PTmod_hc_agree}
+agreeableness_PTmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_agreeableness", 
+                                     "C_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxA_B", 
+                                           "PTxA_D"))
+summary(agreeableness_PTmod_hc, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r PTmod_hc_consc}
+conscientiousness_PTmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_conscientiousness", 
+                                     "C_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxC_B", 
+                                           "PTxC_D"))
+summary(conscientiousness_PTmod_hc, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r PTmod_hc_hp}
+hp_PTmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_hp", 
+                                     "C_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxHP_B", 
+                                           "PTxHP_D"))
+summary(hp_PTmod_hc, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r PTmod_hc_neuro}
+neuroticism_PTmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_neuroticism", 
+                                     "C_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxN_B", 
+                                           "PTxN_D"))
+summary(neuroticism_PTmod_hc, standardized = TRUE)
+```
+
+#### Extraversion
+```{r PTmod_hc_extra}
+extraversion_PTmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_extraversion", 
+                                     "C_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxE_B", 
+                                           "PTxE_D"))
+summary(extraversion_PTmod_hc, standardized = TRUE)
+```
+
+#### Openness
+```{r PTmod_hc_open}
+openness_PTmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_openness", 
+                                     "C_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxO_B", 
+                                           "PTxO_D"))
+summary(openness_PTmod_hc, standardized = TRUE)
+```
+
+
+### Empathic Concern
+Then empathic concern.
+#### Agreeableness
+```{r empmod_hc_agree}
+agreeableness_empmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_agreeableness", 
+                                     "C_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxA_B", 
+                                           "empxA_D"))
+summary(agreeableness_empmod_hc, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r empmod_hc_consc}
+conscientiousness_empmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_conscientiousness", 
+                                     "C_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxC_B", 
+                                           "empxC_D"))
+summary(conscientiousness_empmod_hc, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r empmod_hc_hp}
+hp_empmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_hp", 
+                                     "C_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxHP_B", 
+                                           "empxHP_D"))
+summary(hp_empmod_hc, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r empmod_hc_neuro}
+neuroticism_empmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_neuroticism", 
+                                     "C_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxN_B", 
+                                           "empxN_D"))
+summary(neuroticism_empmod_hc, standardized = TRUE)
+```
+
+#### Extraversion
+```{r empmod_hc_extra}
+extraversion_empmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_extraversion", 
+                                     "C_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxE_B", 
+                                           "empxE_D"))
+summary(extraversion_empmod_hc, standardized = TRUE)
+```
+
+#### Openness
+```{r empmod_hc_open}
+openness_empmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_openness", 
+                                     "C_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxO_B", 
+                                           "empxO_D"))
+summary(openness_empmod_hc, standardized = TRUE)
+```
+
+
+### Personal Distress
+Then personal distress.
+#### Agreeableness
+```{r dismod_hc_agree}
+agreeableness_dismod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_agreeableness", 
+                                     "C_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxA_B", 
+                                           "disxA_D"))
+summary(agreeableness_dismod_hc, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r dismod_hc_consc}
+conscientiousness_dismod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_conscientiousness", 
+                                     "C_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxC_B", 
+                                           "disxC_D"))
+summary(conscientiousness_dismod_hc, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r dismod_hc_hp}
+hp_dismod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_hp", 
+                                     "C_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxHP_B", 
+                                           "disxHP_D"))
+summary(hp_dismod_hc, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r dismod_hc_neuro}
+neuroticism_dismod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_neuroticism", 
+                                     "C_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxN_B", 
+                                           "disxN_D"))
+summary(neuroticism_dismod_hc, standardized = TRUE)
+```
+
+#### Extraversion
+```{r dismod_hc_extra}
+extraversion_dismod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_extraversion", 
+                                     "C_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxE_B", 
+                                           "disxE_D"))
+summary(extraversion_dismod_hc, standardized = TRUE)
+```
+
+#### Openness
+```{r dismod_hc_open}
+openness_dismod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_openness", 
+                                     "C_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxO_B", 
+                                           "disxO_D"))
+summary(openness_dismod_hc, standardized = TRUE)
+```
+
+### Fantasy
+Lastly, the fantasy subscale.
+#### Agreeableness
+```{r fantmod_hc_agree}
+agreeableness_fantmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_agreeableness", 
+                                     "C_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxA_B", 
+                                           "fantxA_D"))
+summary(agreeableness_fantmod_hc, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r fantmod_hc_consc}
+conscientiousness_fantmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_conscientiousness", 
+                                     "C_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxC_B", 
+                                           "fantxC_D"))
+summary(conscientiousness_fantmod_hc, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r fantmod_hc_hp}
+hp_fantmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_hp", 
+                                     "C_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxHP_B", 
+                                           "fantxHP_D"))
+summary(hp_fantmod_hc, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r fantmod_hc_neuro}
+neuroticism_fantmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_neuroticism", 
+                                     "C_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxN_B", 
+                                           "fantxN_D"))
+summary(neuroticism_fantmod_hc, standardized = TRUE)
+```
+
+#### Extraversion
+```{r fantmod_hc_extra}
+extraversion_fantmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_extraversion", 
+                                     "C_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxE_B", 
+                                           "fantxE_D"))
+summary(extraversion_fantmod_hc, standardized = TRUE)
+```
+
+#### Openness
+```{r fantmod_hc_open}
+openness_fantmod_hc <- rep_consensus_id_mods(study1,
+                      p1_reports = c("A_C_openness", 
+                                     "C_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxO_B", 
+                                           "fantxO_D"))
+summary(openness_fantmod_hc, standardized = TRUE)
+```
+
+### Table of Empathy Moderating Hearsay Consensus
+And now a table with all of the empathy moderating hearsay consensus analyses, which is similar to the first part of Table S6. 
+```{r emp_mod_hc_table}
+emp_mod_hc <- ls()[str_detect(ls(), "PTmod_hc$|empmod_hc$|dismod_hc$|fantmod_hc$")]
+         
+
+emp_mod_hc %>% 
+  map(get) %>% 
+  map_df(ez_id_mod_table) %>%
+  cbind(domain = rep(as.character(str_extract_all(emp_mod_hc, "^[:alpha:]*")), 
+                     each = 3)) %>% 
+  mutate(moderator = rep(str_extract(emp_mod_hc, "_[:alnum:]*"), each = 3),
+         moderator = str_remove_all(moderator, "_"),
+         moderator = str_remove_all(moderator, "mod"),
+         moderator = case_when(moderator == "PT" ~ "Perspective Taking",
+                               moderator == "emp" ~ "Empathic Concern",
+                               moderator == "dis" ~ "Personal Distress",
+                               moderator == "fant" ~ "Fantasy"),
+  moderator = fct_relevel(moderator,
+                          "Perspective Taking",
+                          "Empathic Concern",
+                          "Personal Distress",
+                          "Fantasy"),
+  domain = fct_relevel(domain,
+                       "agreeableness",
+                       "conscientiousness",
+                       "hp",
+                       "neuroticism",
+                       "extraversion",
+                       "openness"),
+  pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), 
+                                             "0.", "."), 4, 
+                                 side = "right", pad ="0"),  
+                         "< .001")) %>% 
+  filter(parameter == "interaction effect") %>% 
+  select(moderator, domain, everything(), -parameter) %>% 
+  arrange(moderator, domain) %>% 
+  knitr::kable(caption = "Empathy Moderating Hearsay Consensus (akin to part of Table S6)",
+               digits = c(NA, NA, 2, 2, 2, NA)) %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+
+
+## Empathy Moderating Hearsay Accuracy
+Finally, empathy moderating hearsay accuracy, which are the last analyses included in Study 1.
+### Perspective Taking
+#### Agreeableness
+```{r PTmod_ha_agree}
+agreeableness_PTmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_agreeableness", 
+                                     "A_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxA_B", 
+                                           "PTxA_D"))
+summary(agreeableness_PTmod_ha, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r PTmod_ha_consc}
+conscientiousness_PTmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_conscientiousness", 
+                                     "A_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxC_B", 
+                                           "PTxC_D"))
+summary(conscientiousness_PTmod_ha, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r PTmod_ha_hp}
+hp_PTmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_hp", 
+                                     "A_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxHP_B", 
+                                           "PTxHP_D"))
+summary(hp_PTmod_ha, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r PTmod_ha_neuro}
+neuroticism_PTmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_neuroticism", 
+                                     "A_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxN_B", 
+                                           "PTxN_D"))
+summary(neuroticism_PTmod_ha, standardized = TRUE)
+```
+
+#### Extraversion
+```{r PTmod_ha_extra}
+extraversion_PTmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_extraversion", 
+                                     "A_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxE_B", 
+                                           "PTxE_D"))
+summary(extraversion_PTmod_ha, standardized = TRUE)
+```
+
+#### Openness
+```{r PTmod_ha_open}
+openness_PTmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_openness", 
+                                     "A_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_iri_perspective_cent",
+                                          "D_iri_perspective_cent"),
+                      interaction_term = c("PTxO_B", 
+                                           "PTxO_D"))
+summary(openness_PTmod_ha, standardized = TRUE)
+```
+
+
+### Empathic Concern
+#### Agreeableness
+```{r empmod_ha_agree}
+agreeableness_empmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_agreeableness", 
+                                     "A_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxA_B", 
+                                           "empxA_D"))
+summary(agreeableness_empmod_ha, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r empmod_ha_consc}
+conscientiousness_empmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_conscientiousness", 
+                                     "A_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxC_B", 
+                                           "empxC_D"))
+summary(conscientiousness_empmod_ha, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r empmod_ha_hp}
+hp_empmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_hp", 
+                                     "A_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxHP_B", 
+                                           "empxHP_D"))
+summary(hp_empmod_ha, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r empmod_ha_neuro}
+neuroticism_empmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_neuroticism", 
+                                     "A_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxN_B", 
+                                           "empxN_D"))
+summary(neuroticism_empmod_ha, standardized = TRUE)
+```
+
+#### Extraversion
+```{r empmod_ha_extra}
+extraversion_empmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_extraversion", 
+                                     "A_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxE_B", 
+                                           "empxE_D"))
+summary(extraversion_empmod_ha, standardized = TRUE)
+```
+
+#### Openness
+```{r empmod_ha_open}
+openness_empmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_openness", 
+                                     "A_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_iri_empathic_cent",
+                                          "D_iri_empathic_cent"),
+                      interaction_term = c("empxO_B", 
+                                           "empxO_D"))
+summary(openness_empmod_ha, standardized = TRUE)
+```
+
+
+### Personal Distress
+#### Agreeableness
+```{r dismod_ha_agree}
+agreeableness_dismod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_agreeableness", 
+                                     "A_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxA_B", 
+                                           "disxA_D"))
+summary(agreeableness_dismod_ha, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r dismod_ha_consc}
+conscientiousness_dismod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_conscientiousness", 
+                                     "A_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxC_B", 
+                                           "disxC_D"))
+summary(conscientiousness_dismod_ha, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r dismod_ha_hp}
+hp_dismod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_hp", 
+                                     "A_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxHP_B", 
+                                           "disxHP_D"))
+summary(hp_dismod_ha, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r dismod_ha_neuro}
+neuroticism_dismod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_neuroticism", 
+                                     "A_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxN_B", 
+                                           "disxN_D"))
+summary(neuroticism_dismod_ha, standardized = TRUE)
+```
+
+#### Extraversion
+```{r dismod_ha_extra}
+extraversion_dismod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_extraversion", 
+                                     "A_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxE_B", 
+                                           "disxE_D"))
+summary(extraversion_dismod_ha, standardized = TRUE)
+```
+
+#### Openness
+```{r dismod_ha_open}
+openness_dismod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_openness", 
+                                     "A_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_iri_distress_cent",
+                                          "D_iri_distress_cent"),
+                      interaction_term = c("disxO_B", 
+                                           "disxO_D"))
+summary(openness_dismod_ha, standardized = TRUE)
+```
+
+### Fantasy
+#### Agreeableness
+```{r fantmod_ha_agree}
+agreeableness_fantmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_agreeableness", 
+                                     "A_A_agreeableness"),
+                      p2_reports = c("B_C_agreeableness_cent", 
+                                     "D_A_agreeableness_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxA_B", 
+                                           "fantxA_D"))
+summary(agreeableness_fantmod_ha, standardized = TRUE)
+```
+
+#### Conscientiousness
+```{r fantmod_ha_consc}
+conscientiousness_fantmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_conscientiousness", 
+                                     "A_A_conscientiousness"),
+                      p2_reports = c("B_C_conscientiousness_cent", 
+                                     "D_A_conscientiousness_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxC_B", 
+                                           "fantxC_D"))
+summary(conscientiousness_fantmod_ha, standardized = TRUE)
+```
+#### Honesty-Propriety
+```{r fantmod_ha_hp}
+hp_fantmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_hp", 
+                                     "A_A_hp"),
+                      p2_reports = c("B_C_hp_cent", 
+                                     "D_A_hp_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxHP_B", 
+                                           "fantxHP_D"))
+summary(hp_fantmod_ha, standardized = TRUE)
+```
+
+#### Neuroticism
+```{r fantmod_ha_neuro}
+neuroticism_fantmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_neuroticism", 
+                                     "A_A_neuroticism"),
+                      p2_reports = c("B_C_neuroticism_cent", 
+                                     "D_A_neuroticism_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxN_B", 
+                                           "fantxN_D"))
+summary(neuroticism_fantmod_ha, standardized = TRUE)
+```
+
+#### Extraversion
+```{r fantmod_ha_extra}
+extraversion_fantmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_extraversion", 
+                                     "A_A_extraversion"),
+                      p2_reports = c("B_C_extraversion_cent", 
+                                     "D_A_extraversion_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxE_B", 
+                                           "fantxE_D"))
+summary(extraversion_fantmod_ha, standardized = TRUE)
+```
+
+#### Openness
+```{r fantmod_ha_open}
+openness_fantmod_ha <- rep_accuracy_id_mods(study1,
+                      target_self = c("C_C_openness", 
+                                     "A_A_openness"),
+                      p2_reports = c("B_C_openness_cent", 
+                                     "D_A_openness_cent"),
+                      id_mod_variable = c("B_iri_fantasy_cent",
+                                          "D_iri_fantasy_cent"),
+                      interaction_term = c("fantxO_B", 
+                                           "fantxO_D"))
+summary(openness_fantmod_ha, standardized = TRUE)
+```
+
+### Table of Empathy Moderating Hearsay Accuracy
+This table has all of the empathy moderating hearsay accuracy similar to the second half of Supplemental Table S6
+```{r emp_mod_ha_tbl}
+emp_mod_ha <- ls()[str_detect(ls(), "PTmod_ha$|empmod_ha$|dismod_ha$|fantmod_ha$")]
+         
+
+emp_mod_ha %>% 
+  map(get) %>% 
+  map_df(ez_id_mod_table) %>%
+  cbind(domain = rep(as.character(str_extract_all(emp_mod_ha, "^[:alpha:]*")), 
+                     each = 3)) %>% 
+  mutate(moderator = rep(str_extract(emp_mod_ha, "_[:alnum:]*"), each = 3),
+         moderator = str_remove_all(moderator, "_"),
+         moderator = str_remove_all(moderator, "mod"),
+         moderator = case_when(moderator == "PT" ~ "Perspective Taking",
+                               moderator == "emp" ~ "Empathic Concern",
+                               moderator == "dis" ~ "Personal Distress",
+                               moderator == "fant" ~ "Fantasy"),
+  moderator = fct_relevel(moderator,
+                          "Perspective Taking",
+                          "Empathic Concern",
+                          "Personal Distress",
+                          "Fantasy"),
+  domain = fct_relevel(domain,
+                       "agreeableness",
+                       "conscientiousness",
+                       "hp",
+                       "neuroticism",
+                       "extraversion",
+                       "openness"),
+  pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), 
+                                             "0.", "."), 4, 
+                                 side = "right", pad ="0"),  
+                         "< .001")) %>% 
+  filter(parameter == "interaction effect") %>% 
+  select(moderator, domain, everything(), -parameter) %>% 
+  arrange(moderator, domain) %>% 
+  knitr::kable(caption = "Empathy Moderating Hearsay Accuracy (akin to part of Table S6)",
+               digits = c(NA, NA, 2, 2, 2, NA)) %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+# Study 2
+
+The Study 2 analyses (below) are in the same order as the manuscript, which is: 
+1. the context manipulation analyses 
+2. the social decision (leadership and friendship judgement) analyses
+3. the integrated analyses.
+
+## Status-relevant context and extraversion
+
+We'll start by 
+```{r}
+extra_status_noeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "condition",
+                                        groups_eql = "none",
+                                        params_eql = "none",
+                                        use_labs = TRUE)
+
+extra_status_haeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "condition",
+                                        groups_eql = 2:3,
+                                        params_eql = "ha",
+                                        use_labs = TRUE)
+
+extra_status_hchaeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "condition",
+                                        groups_eql = 2:3,
+                                        params_eql = c("ha", "hc"),
+                                        use_labs = TRUE)
+
+extra_status_hchadaeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "condition",
+                                        groups_eql = 2:3,
+                                        params_eql = c("ha", "hc", "da"),
+                                        use_labs = TRUE)
+anova(extra_status_noeq,
+      extra_status_haeq,
+      extra_status_hchaeq,
+      extra_status_hchadaeq)
+
+anova(extra_status_noeq,
+      extra_status_haeq,
+      extra_status_hchaeq,
+      extra_status_hchadaeq) %>% 
+  as_tibble() %>% 
+  mutate(delt_aic = lag(AIC) - AIC,
+         delt_bic = lag(BIC) - BIC) %>% 
+  slice(-1) %>% 
+  cbind(comparison = c("Hearsay Consensus Equal",
+                       "Hearsay Accuracy Equal",
+                       "Direct Accuracy Equal")) %>% 
+  select(comparison, 5:9) %>% 
+  mutate(comparison = as.character(comparison),
+         comparison = ifelse(comparison == "Direct Accuracy Equal", 
+                             paste0(comparison, footnote_marker_alphabet(1)), comparison)) %>% 
+  knitr::kable(caption = "Model Comparison Results for Status-Relevant Context and Extraversion",
+               digits = c(NA, 2, 0, 3, 2, 2),
+               format = "html", escape = FALSE) %>% 
+  kable_styling("striped", full_width = F) %>% 
+  footnote(alphabet = "not pre-registered")
+```
+```{r}
+ez_differential_group_table(extra_status_noeq)
+```
+

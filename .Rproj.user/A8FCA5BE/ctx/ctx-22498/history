@@ -1,0 +1,512 @@
+size = 1) +
+labs(y = "r") +
+theme_rep_manuscript +
+geom_hline(yintercept = 0, linetype = 2, alpha = .5) +
+scale_y_continuous(limit=c(-0.3, .80))+
+coord_flip()+
+guides(shape=guide_legend(reverse=TRUE)) +
+facet_wrap(~parameter)
+for (each in unique(diff_plot_data$parameter)){
+plot_data <- filter(diff_plot_data, parameter == each)
+plot <- ggplot(data = plot_data, aes(x = domain, y = r, shape = source)) +
+geom_pointrange(aes(ymin = ci_lower, ymax = ci_upper), position = position_dodge(width = .4),
+size = 1) +
+labs(title = str_to_title(print(each)),
+y = "r") +
+theme_rep_manuscript +
+geom_hline(yintercept = 0, linetype = 2, alpha = .5) +
+scale_y_continuous(limit=c(-0.3, .80))+
+coord_flip()+
+guides(shape=guide_legend(reverse=TRUE))
+ggsave(paste0("Plots/Study1_", print(each), ".png"), plot,
+device = "png", height = 5, width = 9.5)
+ggsave(paste0("Plots/Study1_", print(each), "_4ppt.png"), plot,
+device = "png", height = 5, width = 9.5, scale = .80)
+}
+# specify the model
+agreeableness_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_agreeableness ~ DHA*B_C_agreeableness + DDA*A_C_agreeableness
+A_A_agreeableness ~ DHA*D_A_agreeableness + DDA*C_A_agreeableness
+# hearsay consensus
+B_C_agreeableness ~~ HC*A_C_agreeableness
+D_A_agreeableness ~~ HC*C_A_agreeableness
+# variances (pooled)
+C_C_agreeableness ~~ v_self*C_C_agreeableness
+A_A_agreeableness ~~ v_self*A_A_agreeableness
+A_C_agreeableness ~~ v_P1*A_C_agreeableness
+C_A_agreeableness ~~ v_P1*C_A_agreeableness
+B_C_agreeableness ~~ v_P2*B_C_agreeableness
+D_A_agreeableness ~~ v_P2*D_A_agreeableness
+# intercepts (pooled)
+C_C_agreeableness ~ int_self*1
+A_A_agreeableness ~ int_self*1
+B_C_agreeableness ~ int_P1*1
+D_A_agreeableness ~ int_P1*1
+A_C_agreeableness ~ int_P2*1
+C_A_agreeableness ~ int_P2*1
+'
+# fit the model
+fit_agreeableness_distinctive_hearsay_accuracy <-
+sem(agreeableness_distinctive_hearsay_accuracy,
+data = study1,
+# missing = FIML critical due to planned missingness
+missing="FIML")
+# display results
+summary(fit_agreeableness_distinctive_hearsay_accuracy,
+# include standardized estimates
+standardized=TRUE)
+agree_ha_table <- fit_agreeableness_distinctive_hearsay_accuracy@ParTable %>%
+as.data.frame() %>%
+select(label, lhs, op, rhs) %>%
+left_join(standardizedsolution(fit_agreeableness_distinctive_hearsay_accuracy)) %>%
+filter(label == "DHA" |
+label == "DDA" |
+label == "HC") %>%
+filter(duplicated(.[["label"]])) %>%
+mutate(
+label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+select(label, est.std, ci.lower, ci.upper, pvalue)
+knitr::kable(agree_ha_table,
+digits = c(NA, 2, 2, 2, 3),
+caption = "Distinctive Hearsay Accuracy: Agreeableness")
+# specify the model
+conscientiousness_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_conscientiousness ~ DHA*B_C_conscientiousness + DDA*A_C_conscientiousness
+A_A_conscientiousness ~ DHA*D_A_conscientiousness + DDA*C_A_conscientiousness
+# hearsay consensus
+B_C_conscientiousness ~~ HC*A_C_conscientiousness
+D_A_conscientiousness ~~ HC*C_A_conscientiousness
+# variances (pooled)
+C_C_conscientiousness ~~ v_self*C_C_conscientiousness
+A_A_conscientiousness ~~ v_self*A_A_conscientiousness
+A_C_conscientiousness ~~ v_P1*A_C_conscientiousness
+C_A_conscientiousness ~~ v_P1*C_A_conscientiousness
+B_C_conscientiousness ~~ v_P2*B_C_conscientiousness
+D_A_conscientiousness ~~ v_P2*D_A_conscientiousness
+# intercepts (pooled)
+C_C_conscientiousness ~ int_self*1
+A_A_conscientiousness ~ int_self*1
+B_C_conscientiousness ~ int_P1*1
+D_A_conscientiousness ~ int_P1*1
+A_C_conscientiousness ~ int_P2*1
+C_A_conscientiousness ~ int_P2*1
+'
+# fit the model
+fit_conscientiousness_distinctive_hearsay_accuracy <-
+sem(conscientiousness_distinctive_hearsay_accuracy,
+data=study1,
+# missing = FIML critical due to planned missingness
+missing="FIML")
+# display results
+summary(fit_conscientiousness_distinctive_hearsay_accuracy,
+# include standardized estimates
+standardized=TRUE)
+consc_ha_table <- fit_conscientiousness_distinctive_hearsay_accuracy@ParTable %>%
+as.data.frame() %>%
+select(label, lhs, op, rhs) %>%
+left_join(standardizedsolution(fit_conscientiousness_distinctive_hearsay_accuracy)) %>%
+filter(label == "DHA" |
+label == "DDA" |
+label == "HC") %>%
+filter(duplicated(.[["label"]])) %>%
+mutate(
+label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+select(label, est.std, ci.lower, ci.upper, pvalue)
+knitr::kable(consc_ha_table,
+digits = c(NA, 2, 2, 2, 3),
+caption = "Distinctive Hearsay Accuracy: Conscientiousness")
+# specify the model
+hp_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_hp ~ DHA*B_C_hp + DDA*A_C_hp
+A_A_hp ~ DHA*D_A_hp + DDA*C_A_hp
+# hearsay consensus
+B_C_hp ~~ HC*A_C_hp
+D_A_hp ~~ HC*C_A_hp
+# variances (pooled)
+C_C_hp ~~ v_self*C_C_hp
+A_A_hp ~~ v_self*A_A_hp
+A_C_hp ~~ v_P1*A_C_hp
+C_A_hp ~~ v_P1*C_A_hp
+B_C_hp ~~ v_P2*B_C_hp
+D_A_hp ~~ v_P2*D_A_hp
+# intercepts (pooled)
+C_C_hp ~ int_self*1
+A_A_hp ~ int_self*1
+B_C_hp ~ int_P1*1
+D_A_hp ~ int_P1*1
+A_C_hp ~ int_P2*1
+C_A_hp ~ int_P2*1
+'
+# fit the model
+fit_hp_distinctive_hearsay_accuracy <-
+sem(hp_distinctive_hearsay_accuracy,
+data=study1,
+# missing = FIML critical due to planned missingness
+missing="FIML")
+# display results
+summary(fit_hp_distinctive_hearsay_accuracy,
+# include standardized estimates
+standardized=TRUE)
+hp_ha_table <- fit_hp_distinctive_hearsay_accuracy@ParTable %>%
+as.data.frame() %>%
+select(label, lhs, op, rhs) %>%
+left_join(standardizedsolution(fit_hp_distinctive_hearsay_accuracy)) %>%
+filter(label == "DHA" |
+label == "DDA" |
+label == "HC") %>%
+filter(duplicated(.[["label"]])) %>%
+mutate(
+label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+select(label, est.std, ci.lower, ci.upper, pvalue)
+knitr::kable(hp_ha_table,
+digits = c(NA, 2, 2, 2, 3),
+caption = "Distinctive Hearsay Accuracy: HP")
+# specify the model
+neuroticism_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_neuroticism ~ DHA*B_C_neuroticism + DDA*A_C_neuroticism
+A_A_neuroticism ~ DHA*D_A_neuroticism + DDA*C_A_neuroticism
+# hearsay consensus
+B_C_neuroticism ~~ HC*A_C_neuroticism
+D_A_neuroticism ~~ HC*C_A_neuroticism
+# variances (pooled)
+C_C_neuroticism ~~ v_self*C_C_neuroticism
+A_A_neuroticism ~~ v_self*A_A_neuroticism
+A_C_neuroticism ~~ v_P1*A_C_neuroticism
+C_A_neuroticism ~~ v_P1*C_A_neuroticism
+B_C_neuroticism ~~ v_P2*B_C_neuroticism
+D_A_neuroticism ~~ v_P2*D_A_neuroticism
+# intercepts (pooled)
+C_C_neuroticism ~ int_self*1
+A_A_neuroticism ~ int_self*1
+B_C_neuroticism ~ int_P1*1
+D_A_neuroticism ~ int_P1*1
+A_C_neuroticism ~ int_P2*1
+C_A_neuroticism ~ int_P2*1
+'
+# fit the model
+fit_neuroticism_distinctive_hearsay_accuracy <-
+sem(neuroticism_distinctive_hearsay_accuracy,
+data=study1,
+# missing = FIML critical due to planned missingness
+missing="FIML")
+# display results
+summary(fit_neuroticism_distinctive_hearsay_accuracy,
+# include standardized estimates
+standardized=TRUE)
+neur_ha_table <- fit_neuroticism_distinctive_hearsay_accuracy@ParTable %>%
+as.data.frame() %>%
+select(label, lhs, op, rhs) %>%
+left_join(standardizedsolution(fit_neuroticism_distinctive_hearsay_accuracy)) %>%
+filter(label == "DHA" |
+label == "DDA" |
+label == "HC") %>%
+filter(duplicated(.[["label"]])) %>%
+mutate(
+label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+select(label, est.std, ci.lower, ci.upper, pvalue)
+knitr::kable(neur_ha_table,
+digits = c(NA, 2, 2, 2, 3),
+caption = "Distinctive Hearsay Accuracy: Neuroticism")
+# specify the model
+extraversion_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_extraversion ~ DHA*B_C_extraversion + DDA*A_C_extraversion
+A_A_extraversion ~ DHA*D_A_extraversion + DDA*C_A_extraversion
+# hearsay consensus
+B_C_extraversion ~~ HC*A_C_extraversion
+D_A_extraversion ~~ HC*C_A_extraversion
+# variances (pooled)
+C_C_extraversion ~~ v_self*C_C_extraversion
+A_A_extraversion ~~ v_self*A_A_extraversion
+A_C_extraversion ~~ v_P1*A_C_extraversion
+C_A_extraversion ~~ v_P1*C_A_extraversion
+B_C_extraversion ~~ v_P2*B_C_extraversion
+D_A_extraversion ~~ v_P2*D_A_extraversion
+# intercepts (pooled)
+C_C_extraversion ~ int_self*1
+A_A_extraversion ~ int_self*1
+B_C_extraversion ~ int_P1*1
+D_A_extraversion ~ int_P1*1
+A_C_extraversion ~ int_P2*1
+C_A_extraversion ~ int_P2*1
+'
+# fit the model
+fit_extraversion_distinctive_hearsay_accuracy <-
+sem(extraversion_distinctive_hearsay_accuracy,
+data=study1,
+# missing = FIML critical due to planned missingness
+missing="FIML")
+# display results
+summary(fit_extraversion_distinctive_hearsay_accuracy,
+# include standardized estimates
+standardized=TRUE)
+extra_ha_table <- fit_extraversion_distinctive_hearsay_accuracy@ParTable %>%
+as.data.frame() %>%
+select(label, lhs, op, rhs) %>%
+left_join(standardizedsolution(fit_extraversion_distinctive_hearsay_accuracy)) %>%
+filter(label == "DHA" |
+label == "DDA" |
+label == "HC") %>%
+filter(duplicated(.[["label"]])) %>%
+mutate(
+label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+select(label, est.std, ci.lower, ci.upper, pvalue)
+knitr::kable(extra_ha_table,
+digits = c(NA, 2, 2, 2, 3),
+caption = "Distinctive Hearsay Accuracy: Extraversion")
+# specify the model
+openness_distinctive_hearsay_accuracy <-'
+# distinctive hearsay accuracy and distinctive direct accuracy paths
+C_C_openness ~ DHA*B_C_openness + DDA*A_C_openness
+A_A_openness ~ DHA*D_A_openness + DDA*C_A_openness
+# hearsay consensus
+B_C_openness ~~ HC*A_C_openness
+D_A_openness ~~ HC*C_A_openness
+# variances (pooled)
+C_C_openness ~~ v_self*C_C_openness
+A_A_openness ~~ v_self*A_A_openness
+A_C_openness ~~ v_P1*A_C_openness
+C_A_openness ~~ v_P1*C_A_openness
+B_C_openness ~~ v_P2*B_C_openness
+D_A_openness ~~ v_P2*D_A_openness
+# intercepts (pooled)
+C_C_openness ~ int_self*1
+A_A_openness ~ int_self*1
+B_C_openness ~ int_P1*1
+D_A_openness ~ int_P1*1
+A_C_openness ~ int_P2*1
+C_A_openness ~ int_P2*1
+'
+# fit the model
+fit_openness_distinctive_hearsay_accuracy <-
+sem(openness_distinctive_hearsay_accuracy,
+data=study1,
+# missing = FIML critical due to planned missingness
+missing="FIML")
+# display results
+summary(fit_openness_distinctive_hearsay_accuracy,
+# include standardized estimates
+standardized=TRUE)
+open_ha_table <- fit_openness_distinctive_hearsay_accuracy@ParTable %>%
+as.data.frame() %>%
+select(label, lhs, op, rhs) %>%
+left_join(standardizedsolution(fit_openness_distinctive_hearsay_accuracy)) %>%
+filter(label == "DHA" |
+label == "DDA" |
+label == "HC") %>%
+filter(duplicated(.[["label"]])) %>%
+mutate(
+label = str_replace_all(label, "DHA", "Distinctive Hearsay Accuracy"),
+label = str_replace_all(label, "DDA", "Distinctive Direct Accuracy"),
+label = str_replace_all(label, "HC", "Hearsay Consensus")) %>%
+select(label, est.std, ci.lower, ci.upper, pvalue)
+knitr::kable(open_ha_table, digits = c(NA, 2, 2, 2, 3),
+caption = "Distinctive Hearsay Accuracy: Openness")
+agree_ha_table$domain = "Agreeableness"
+consc_ha_table$domain = "Conscientiousness"
+hp_ha_table$domain = "Honesty-Propriety"
+neur_ha_table$domain = "Neuroticism"
+extra_ha_table$domain = "Extraversion"
+open_ha_table$domain = "Openness"
+agree_ha_table %>%
+full_join(consc_ha_table) %>%
+full_join(hp_ha_table) %>%
+full_join(neur_ha_table) %>%
+full_join(extra_ha_table) %>%
+full_join(open_ha_table) %>%
+select(domain, label, est.std, ci.lower, ci.upper, pvalue) %>%
+knitr::kable(digits = c(NA, NA, 2, 2, 2, 3),
+caption = "Distinctive Hearsay Accuracy: All Big Six")
+study1 <-
+study1 %>%
+# First, mean center the predictors,
+# since this is a continuous by continuous interaction.
+# We'll do this scale()
+mutate(
+# first, mean center P2 ratings for each domain
+B_C_extraversion_cent      = scale(B_C_extraversion, scale = FALSE),
+D_A_extraversion_cent      = scale(D_A_extraversion, scale = FALSE),
+B_C_agreeableness_cent     = scale(B_C_agreeableness, scale = FALSE),
+D_A_agreeableness_cent     = scale(D_A_agreeableness, scale = FALSE),
+B_C_conscientiousness_cent = scale(B_C_conscientiousness, scale = FALSE),
+D_A_conscientiousness_cent = scale(D_A_conscientiousness, scale = FALSE),
+B_C_neuroticism_cent       = scale(B_C_neuroticism, scale = FALSE),
+D_A_neuroticism_cent       = scale(D_A_neuroticism, scale = FALSE),
+B_C_openness_cent          = scale(B_C_openness, scale = FALSE),
+D_A_openness_cent          = scale(D_A_openness, scale = FALSE),
+B_C_hp_cent                = scale(B_C_hp, scale = FALSE),
+D_A_hp_cent                = scale(D_A_hp, scale = FALSE),
+# next, mean center empathy subscales (only have B and D for this)
+# this is a proposed moderator of consensus/accuracy
+B_iri_perspective_cent     = scale(B_iri_perspective, scale = FALSE),
+D_iri_perspective_cent     = scale(D_iri_perspective, scale = FALSE),
+B_iri_empathic_cent        = scale(B_iri_empathic, scale = FALSE),
+D_iri_empathic_cent        = scale(D_iri_empathic, scale = FALSE),
+B_iri_distress_cent        = scale(B_iri_distress, scale = FALSE),
+D_iri_distress_cent        = scale(D_iri_distress, scale = FALSE),
+B_iri_fantasy_cent         = scale(B_iri_fantasy, scale = FALSE),
+D_iri_fantasy_cent         = scale(D_iri_fantasy, scale = FALSE),
+# mean center self-reported extraversion
+# this is a proposed moderator of consensus/accuracy
+A_A_extraversion_cent      = scale(A_A_extraversion, scale = FALSE),
+C_C_extraversion_cent      = scale(C_C_extraversion, scale = FALSE),
+A_C_extraversion_cent      = scale(A_C_extraversion, scale = FALSE),
+C_A_extraversion_cent      = scale(C_A_extraversion, scale = FALSE),
+B_B_extraversion_cent      = scale(B_B_extraversion, scale = FALSE),
+D_D_extraversion_cent      = scale(D_D_extraversion, scale = FALSE)) %>%
+# Next, create interaction terms
+mutate(
+# Extraversion moderators (for extraversion)
+extraXextra_AB = A_A_extraversion_cent*B_C_extraversion_cent,
+extraXextra_CD = C_C_extraversion_cent*D_A_extraversion_cent,
+extraXextra_BB = B_B_extraversion_cent*B_C_extraversion_cent,
+extraXextra_DD = D_D_extraversion_cent*D_A_extraversion_cent,
+extraXextra_CB = C_C_extraversion_cent*B_C_extraversion_cent,
+extraXextra_AD = A_A_extraversion_cent*D_A_extraversion_cent,
+# Extraversion moderators (for agreeableness)
+extraXagree_AB = A_A_extraversion_cent*B_C_agreeableness_cent,
+extraXagree_CD = C_C_extraversion_cent*D_A_agreeableness_cent,
+extraXagree_BB = B_B_extraversion_cent*B_C_agreeableness_cent,
+extraXagree_DD = D_D_extraversion_cent*D_A_agreeableness_cent,
+extraXagree_CB = C_C_extraversion_cent*B_C_agreeableness_cent,
+extraXagree_AD = A_A_extraversion_cent*D_A_agreeableness_cent,
+# Extraversion moderators (for conscientiousness)
+extraXconsc_AB = A_A_extraversion_cent*B_C_conscientiousness_cent,
+extraXconsc_CD = C_C_extraversion_cent*D_A_conscientiousness_cent,
+extraXconsc_BB = B_B_extraversion_cent*B_C_conscientiousness_cent,
+extraXconsc_DD = D_D_extraversion_cent*D_A_conscientiousness_cent,
+extraXconsc_CB = C_C_extraversion_cent*B_C_conscientiousness_cent,
+extraXconsc_AD = A_A_extraversion_cent*D_A_conscientiousness_cent,
+# Extraversion moderators (for Neuroticism)
+extraXneuro_AB = A_A_extraversion_cent*B_C_neuroticism_cent,
+extraXneuro_CD = C_C_extraversion_cent*D_A_neuroticism_cent,
+extraXneuro_BB = B_B_extraversion_cent*B_C_neuroticism_cent,
+extraXneuro_DD = D_D_extraversion_cent*D_A_neuroticism_cent,
+extraXneuro_CB = C_C_extraversion_cent*B_C_neuroticism_cent,
+extraXneuro_AD = A_A_extraversion_cent*D_A_neuroticism_cent,
+# Extraversion moderators (for Openness)
+extraXopen_AB = A_A_extraversion_cent*B_C_openness_cent,
+extraXopen_CD = C_C_extraversion_cent*D_A_openness_cent,
+extraXopen_BB = B_B_extraversion_cent*B_C_openness_cent,
+extraXopen_DD = D_D_extraversion_cent*D_A_openness_cent,
+extraXopen_CB = C_C_extraversion_cent*B_C_openness_cent,
+extraXopen_AD = A_A_extraversion_cent*D_A_openness_cent,
+# Extraversion moderators (for HP)
+extraXHP_AB = A_A_extraversion_cent*B_C_hp_cent,
+extraXHP_CD = C_C_extraversion_cent*D_A_hp_cent,
+extraXHP_BB = B_B_extraversion_cent*B_C_hp_cent,
+extraXHP_DD = D_D_extraversion_cent*D_A_hp_cent,
+extraXHP_CB = C_C_extraversion_cent*B_C_hp_cent,
+extraXHP_AD = A_A_extraversion_cent*D_A_hp_cent,
+# perspective taking moderators (for extraversion)
+PTxE_B = B_iri_perspective_cent*B_C_extraversion_cent,
+PTxE_D = D_iri_perspective_cent*D_A_extraversion_cent,
+# perspective taking moderators (for agreeableness)
+PTxA_B = B_iri_perspective_cent*B_C_agreeableness_cent,
+PTxA_D = D_iri_perspective_cent*D_A_agreeableness_cent,
+# perspective taking moderators (for conscientiousness)
+PTxC_B = B_iri_perspective_cent*B_C_conscientiousness_cent,
+PTxC_D = D_iri_perspective_cent*D_A_conscientiousness_cent,
+# perspective taking moderators (for neuroticism)
+PTxN_B = B_iri_perspective_cent*B_C_neuroticism_cent,
+PTxN_D = D_iri_perspective_cent*D_A_neuroticism_cent,
+# perspective taking moderators (for openness)
+PTxO_B = B_iri_perspective_cent*B_C_openness_cent,
+PTxO_D = D_iri_perspective_cent*D_A_openness_cent,
+# perspective taking moderators (for hp)
+PTxHP_B = B_iri_perspective_cent*B_C_hp_cent,
+PTxHP_D = D_iri_perspective_cent*D_A_hp_cent,
+# empathic concern moderators (for extraversion)
+empxE_B = B_iri_empathic_cent*B_C_extraversion_cent,
+empxE_D = D_iri_empathic_cent*D_A_extraversion_cent,
+# empathic concern moderators (for agreeableness)
+empxA_B = B_iri_empathic_cent*B_C_agreeableness_cent,
+empxA_D = D_iri_empathic_cent*D_A_agreeableness_cent,
+# empathic concern moderators (for conscientiousness)
+empxC_B = B_iri_empathic_cent*B_C_conscientiousness_cent,
+empxC_D = D_iri_empathic_cent*D_A_conscientiousness_cent,
+# empathic concern moderators (for neuroticism)
+empxN_B = B_iri_empathic_cent*B_C_neuroticism_cent,
+empxN_D = D_iri_empathic_cent*D_A_neuroticism_cent,
+# empathic concern moderators (for openness)
+empxO_B = B_iri_empathic_cent*B_C_openness_cent,
+empxO_D = D_iri_empathic_cent*D_A_openness_cent,
+# empathic concern moderators (for hp)
+empxHP_B = B_iri_empathic_cent*B_C_hp_cent,
+empxHP_D = D_iri_empathic_cent*D_A_hp_cent,
+# personal distress moderators (for extraversion)
+disxE_B = B_iri_distress_cent*B_C_extraversion_cent,
+disxE_D = D_iri_distress_cent*D_A_extraversion_cent,
+# personal distress moderators (for agreeableness)
+disxA_B = B_iri_distress_cent*B_C_agreeableness_cent,
+disxA_D = D_iri_distress_cent*D_A_agreeableness_cent,
+# personal distress moderators (for conscientiousness)
+disxC_B = B_iri_distress_cent*B_C_conscientiousness_cent,
+disxC_D = D_iri_distress_cent*D_A_conscientiousness_cent,
+# personal distress moderators (for neuroticism)
+disxN_B = B_iri_distress_cent*B_C_neuroticism_cent,
+disxN_D = D_iri_distress_cent*D_A_neuroticism_cent,
+# personal distress moderators (for openness)
+disxO_B = B_iri_distress_cent*B_C_openness_cent,
+disxO_D = D_iri_distress_cent*D_A_openness_cent,
+# personal distress moderators (for hp)
+disxHP_B = B_iri_distress_cent*B_C_hp_cent,
+disxHP_D = D_iri_distress_cent*D_A_hp_cent,
+# fantasy moderators (for extraversion)
+fantxE_B = B_iri_fantasy_cent*B_C_extraversion_cent,
+fantxE_D = D_iri_fantasy_cent*D_A_extraversion_cent,
+# fantasy moderators (for agreeableness)
+fantxA_B = B_iri_fantasy_cent*B_C_agreeableness_cent,
+fantxA_D = D_iri_fantasy_cent*D_A_agreeableness_cent,
+# fantasy moderators (for conscientiousness)
+fantxC_B = B_iri_fantasy_cent*B_C_conscientiousness_cent,
+fantxC_D = D_iri_fantasy_cent*D_A_conscientiousness_cent,
+# fantasy moderators (for neuroticism)
+fantxN_B = B_iri_fantasy_cent*B_C_neuroticism_cent,
+fantxN_D = D_iri_fantasy_cent*D_A_neuroticism_cent,
+# fantasy moderators (for openness)
+fantxO_B = B_iri_fantasy_cent*B_C_openness_cent,
+fantxO_D = D_iri_fantasy_cent*D_A_openness_cent,
+# fantasy moderators (for hp)
+fantxHP_B = B_iri_fantasy_cent*B_C_hp_cent,
+fantxHP_D = D_iri_fantasy_cent*D_A_hp_cent)
+agreeableness_Textmod_hc <- rep_consensus_id_mods(study1,
+p1_reports = c("A_C_agreeableness", "C_A_agreeableness"),
+p2_reports = c("B_C_agreeableness_cent", "D_A_agreeableness_cent"),
+id_mod_variable = c("C_C_extraversion_cent", "A_A_extraversion"),
+interaction_term = c("extraXagree_CB", "extraxagree_AD"))
+agreeableness_Textmod_hc <- rep_consensus_id_mods(study1,
+p1_reports = c("A_C_agreeableness", "C_A_agreeableness"),
+p2_reports = c("B_C_agreeableness_cent", "D_A_agreeableness_cent"),
+id_mod_variable = c("C_C_extraversion_cent", "A_A_extraversion"),
+interaction_term = c("extraXagree_CB", "extraXagree_AD"))
+agreeableness_Textmod_hc <- rep_consensus_id_mods(study1,
+p1_reports = c("A_C_agreeableness", "C_A_agreeableness"),
+p2_reports = c("B_C_agreeableness_cent", "D_A_agreeableness_cent"),
+id_mod_variable = c("C_C_extraversion_cent", "A_A_extraversion_cent"),
+interaction_term = c("extraXagree_CB", "extraXagree_AD"))
+summary(agreeableness_Textmod_hc)
+library(rio)
+library(tidyverse)
+library(ReputationModelR)
+remove.packages("ReputationAnalyses", lib="~/R/win-library/3.6")
+devtools::install_github("coryc3133/ReputationModelR")
+devtools::install_github("coryc3133/ReputationModelR")
+devtools::install_github("coryc3133/ReputationModelR")
+devtools::install_github("coryc3133/ReputationModelR")
+devtools::install_github("coryc3133/ReputationModelR")
+install.packages("digest")
