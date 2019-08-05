@@ -21,8 +21,68 @@ study1 <- import("Data/rep_s1_4ms.csv")
 study2 <- import("Data/rep_s2_4ms.csv") %>% 
   # missing condition are "", but need to be NA
   mutate(condition = ifelse(condition == "", NA, condition))
-integrated <- import("Data/rep_integrated_4ms.csv")
 ```
+
+##  Calculate Scale Scores
+Here I'll score the BFI into domain scores and the IRI into its subscales. I'll also produce coefficeint alphas and basic descriptives. 
+
+I'm going to use the `scoreItems()` function from the `psych` package. This both reverse scores items and calculates scale scores. It also provide some information about the scores, but that isn't particularly helpful here (since we're collapsing across rating type for the sake of calculating scores).
+
+The
+
+### Domains
+* extraversion      = 1, 6, 11R, 16R, 21, 26R, 31R, 36R, 41, 46, 51R, 56
+* agreeableness     = 2, 7, 12R, 17R, 22R, 27, 32, 37R, 42R, 47R, 52, 57
+* conscientiousness = 3R, 8R, 13, 18, 23R, 28R, 33, 38, 43, 48R, 53, 58R
+* neuroticism       = 4R, 9R, 14, 19, 24R, 29R, 34, 39, 44R, 49R, 54, 59
+* openness          = 5R, 10, 15, 20, 25R, 30R, 35, 40, 45R, 50R, 55R, 60
+* hp                = HP45r HP46r HP47r HP48r HP49r HP50 HP51 HP52
+
+
+Using the `scoreItems()` function from the psych package. For this, you provide a list of the scales with a key (basically, quoted variable names with a '-' for items that need to be reverse scored). So first I'll make that key, and then I'll use the key to the score the items into a temporary object called scale_scores_nometa. Then, Ill save out just the `scores` object from the `scale_scores_nometa` object (the object also contains some information about reliability, like alpha; but this is calculated across self-, P1-, and P2-, so not very useful here). At the end of this script, we split the data and use the same scoreItems function to assess scale reliability.
+
+For now, first make the key:
+```{r make_keys_nometa}
+# Make keys
+key_list_big6 <- list(extraversion = c("bfi_1", "bfi_6", "-bfi_11", "-bfi_16", 
+                                  "bfi_21", "-bfi_26", "-bfi_31", "-bfi_36", 
+                                  "bfi_41", "bfi_46", "-bfi_51", "bfi_56"),
+                 agreeableness = c("bfi_2", "bfi_7", "-bfi_12", "-bfi_17", 
+                                   "-bfi_22", "bfi_27", "bfi_32", "-bfi_37", 
+                                   "-bfi_42", "-bfi_47", "bfi_52", "bfi_57"),
+                 conscientiousness = c("-bfi_3", "-bfi_8", "bfi_13", "bfi_18", 
+                                       "-bfi_23", "-bfi_28", "bfi_33", "bfi_38", 
+                                       "bfi_43", "-bfi_48", "bfi_53", "-bfi_58"),
+                 neuroticism = c("-bfi_4", "-bfi_9", "bfi_14", "bfi_19", 
+                                 "-bfi_24", "-bfi_29", "bfi_34", "bfi_39",
+                                 "-bfi_44", "-bfi_49", "bfi_54", "bfi_59"),
+                 openness = c("-bfi_5", "bfi_10", "bfi_15", "bfi_20", 
+                              "-bfi_25", "-bfi_30", "bfi_35", "bfi_40", 
+                              "-bfi_45", "-bfi_50", "-bfi_55", "bfi_60"),
+                 hp = c("-bfi_hp45", "-bfi_hp46", "-bfi_hp47", "-bfi_hp48", 
+                            "-bfi_hp49", "bfi_hp50", "bfi_hp51", "bfi_hp52"))
+```
+
+```{r}
+study1 %>% 
+  gather()
+  
+```
+
+Next, we actually 'make the keys' with the `make.keys() function` and then pass that along to the scoreItems function. Since we did not pre-register any imputation for missing items, we'll set `impute= "none"`, which will have it take the mean across available items.
+
+```{r score_items_nometa}
+# score by 'making keys' and using those to score the items (with scoreItems)
+scale_scores_nometa <- 
+  make.keys(main_qs_wide_nometa, key_list_nometa) %>%
+  scoreItems(main_qs_wide_nometa, impute = "none")
+```
+
+Save out just the scores from the list; going to recycle the `scale_scores_nometa` name, since we don't need that object elsewise.
+```{r save_scores_nometa}
+scale_scores_nometa <- scale_scores_nometa$scores
+```
+
 
 # Study 1
 

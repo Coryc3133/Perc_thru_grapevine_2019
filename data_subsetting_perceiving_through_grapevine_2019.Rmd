@@ -6,7 +6,7 @@ output: html_document
 ---
 # What is this file?
 
-Here I'll read in the full (cleaned, scored, reshaped) datasets, subset them for the variables used in the manuscript, and write out these subsetted files. For the time being, we're posting just these subsetted files, but will make the full data available in the future. 
+Here I'll read in the full (cleaned, scored, reshaped) datasets, subset them for the variables used in the manuscript (item-level, not scale scores), and write out these subsetted files. For the time being, we're posting just these subsetted files, but will make the full data available in the future. 
 
 # Read in Data
 ```{r}
@@ -15,7 +15,6 @@ library(tidyverse)
 
 study1 <- import("../../Data/Study_1/wide_data/rep_s1_full_wide_data.csv")
 study2 <- import("../../Data/Study_2/wide_data/rep_s2_full_wide_data.csv")
-integrated <- import("../../Data/Integrated/rep_both_studies_all_shared_vars.csv")
 ```
 
 # Selecting Vars needed in Analyses
@@ -24,33 +23,18 @@ integrated <- import("../../Data/Integrated/rep_both_studies_all_shared_vars.csv
 ```{r}
 study1 %>% 
   select(sess_id, 
-         # select just the Big Six scale scores
-         contains("agreeableness"),
-         contains("conscientiousness"),
-         ends_with("hp"),
-         contains("neuroticism"),
-         contains("extraversion"),
-         contains("openness"),
-         # And the IRI scale scores
-         contains("iri"),
+        # BFI items. Which includes hp items,
+        # which are not bfi items, but have bfi
+        # in their labels to make thing easy.
+         contains("bfi"),
+        # IRI items, which all start with B_q or D_q
+         starts_with("B_q"),
+         starts_with("D_q"),
          # remove ratings we didn't pre-reg/use
          -starts_with("A_B"),
          -starts_with("B_A"),
          -starts_with("C_D"),
-         -starts_with("D_C"),
-         # we need B & D self-reproted 
-         # Extraversion for moderator analyses
-         # but not the rest of their self-reports
-         -B_B_agreeableness,
-         -B_B_conscientiousness,
-         -B_B_hp,
-         -B_B_neuroticism,
-         -B_B_openness,
-         -D_D_agreeableness,
-         -D_D_conscientiousness,
-         -D_D_hp,
-         -D_D_neuroticism,
-         -D_D_openness) %>% 
+         -starts_with("D_C")) %>% 
   export("Data/rep_s1_4ms.csv")
 ```
 
@@ -59,71 +43,18 @@ study1 %>%
 study2 %>% 
   select(sess_id, 
          condition,
-         # select just the Big Six scale scores
-         contains("agreeableness"),
-         contains("conscientiousness"),
-         ends_with("hp"),
-         contains("neuroticism"),
-         contains("extraversion"),
-         contains("openness"),
+         contains("bfi"),
          # and the social decision qs
          contains("goodleader"),
          contains("goodfriend"),
-         # And the IRI scale scores
-         contains("iri"),
+         # IRI items, which all start with B_q or D_q
+         starts_with("B_q"),
+         starts_with("D_q"),
+         # remove ratings we didn't pre-reg/use
          # remove ratings we didn't pre-reg/use
          -starts_with("A_B"),
          -starts_with("B_A"),
          -starts_with("C_D"),
-         -starts_with("D_C"),
-         # we need B & D self-reproted 
-         # Extraversion for moderator analyses
-         # but not the rest of their self-reports
-         -B_B_agreeableness,
-         -B_B_conscientiousness,
-         -B_B_hp,
-         -B_B_neuroticism,
-         -B_B_openness,
-         -D_D_agreeableness,
-         -D_D_conscientiousness,
-         -D_D_hp,
-         -D_D_neuroticism,
-         -D_D_openness) %>% 
+         -starts_with("D_C")) %>% 
   export("Data/rep_s2_4ms.csv")
 ```
-
-## Integrated
-```{r}
-integrated %>% 
-  select(sess_id, 
-         study,
-         # select just the Big Six scale scores
-         contains("agreeableness"),
-         contains("conscientiousness"),
-         ends_with("hp"),
-         contains("neuroticism"),
-         contains("extraversion"),
-         contains("openness"),
-         # And the IRI scale scores
-         contains("iri"),
-         # remove ratings we didn't pre-reg/use
-         -starts_with("A_B"),
-         -starts_with("B_A"),
-         -starts_with("C_D"),
-         -starts_with("D_C"),
-         # we need B & D self-reproted 
-         # Extraversion for moderator analyses
-         # but not the rest of their self-reports
-         -B_B_agreeableness,
-         -B_B_conscientiousness,
-         -B_B_hp,
-         -B_B_neuroticism,
-         -B_B_openness,
-         -D_D_agreeableness,
-         -D_D_conscientiousness,
-         -D_D_hp,
-         -D_D_neuroticism,
-         -D_D_openness) %>% 
-  export("Data/rep_integrated_4ms.csv")
-```
-
