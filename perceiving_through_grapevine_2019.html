@@ -2857,7 +2857,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Analyses in Perceiving through the Grapevine: A Network Approach to Reputations</h1>
 <h4 class="author">Cory K. Costello &amp; Sanjay Srivastava</h4>
-<h4 class="date">last knitted: 2019-08-02 13:49:02</h4>
+<h4 class="date">last knitted: 2019-08-05 20:10:48</h4>
 
 </div>
 
@@ -2872,8 +2872,1127 @@ library(ReputationModelR)
 study1 &lt;- import(&quot;Data/rep_s1_4ms.csv&quot;)
 study2 &lt;- import(&quot;Data/rep_s2_4ms.csv&quot;) %&gt;% 
   # missing condition are &quot;&quot;, but need to be NA
-  mutate(condition = ifelse(condition == &quot;&quot;, NA, condition))
-integrated &lt;- import(&quot;Data/rep_integrated_4ms.csv&quot;)</code></pre>
+  mutate(condition = ifelse(condition == &quot;&quot;, NA, condition))</code></pre>
+<div id="calculate-scale-scores" class="section level2">
+<h2>Calculate Scale Scores</h2>
+<p>Here I’ll score the BFI into domain scores and the IRI into its subscales. I’ll also produce coefficeint alphas and basic descriptives.</p>
+<p>I’m going to use the <code>scoreItems()</code> function from the <code>psych</code> package. This both reverse scores items and calculates scale scores. It also provide some information about the scores.</p>
+<div id="study-1-data-score-big-six-domains" class="section level3">
+<h3>Study 1 Data: Score Big Six Domains</h3>
+<ul>
+<li>agreeableness = 2, 7, 12R, 17R, 22R, 27, 32, 37R, 42R, 47R, 52, 57</li>
+<li>conscientiousness = 3R, 8R, 13, 18, 23R, 28R, 33, 38, 43, 48R, 53, 58R</li>
+<li>hp = HP45r HP46r HP47r HP48r HP49r HP50 HP51 HP52</li>
+<li>neuroticism = 4R, 9R, 14, 19, 24R, 29R, 34, 39, 44R, 49R, 54, 59</li>
+<li>extraversion = 1, 6, 11R, 16R, 21, 26R, 31R, 36R, 41, 46, 51R, 56</li>
+<li>openness = 5R, 10, 15, 20, 25R, 30R, 35, 40, 45R, 50R, 55R, 60</li>
+</ul>
+<p>For now, first make the key:</p>
+<pre class="r"><code># Make keys
+big6_keys &lt;- list(
+                 agreeableness = c(&quot;bfi_2&quot;, &quot;bfi_7&quot;, &quot;-bfi_12&quot;, &quot;-bfi_17&quot;, 
+                                   &quot;-bfi_22&quot;, &quot;bfi_27&quot;, &quot;bfi_32&quot;, &quot;-bfi_37&quot;, 
+                                   &quot;-bfi_42&quot;, &quot;-bfi_47&quot;, &quot;bfi_52&quot;, &quot;bfi_57&quot;),
+                 conscientiousness = c(&quot;-bfi_3&quot;, &quot;-bfi_8&quot;, &quot;bfi_13&quot;, &quot;bfi_18&quot;, 
+                                       &quot;-bfi_23&quot;, &quot;-bfi_28&quot;, &quot;bfi_33&quot;, &quot;bfi_38&quot;, 
+                                       &quot;bfi_43&quot;, &quot;-bfi_48&quot;, &quot;bfi_53&quot;, &quot;-bfi_58&quot;),
+                 hp = c(&quot;-bfi_hp45&quot;, &quot;-bfi_hp46&quot;, &quot;-bfi_hp47&quot;, &quot;-bfi_hp48&quot;, 
+                            &quot;-bfi_hp49&quot;, &quot;bfi_hp50&quot;, &quot;bfi_hp51&quot;, &quot;bfi_hp52&quot;),
+                 neuroticism = c(&quot;-bfi_4&quot;, &quot;-bfi_9&quot;, &quot;bfi_14&quot;, &quot;bfi_19&quot;, 
+                                 &quot;-bfi_24&quot;, &quot;-bfi_29&quot;, &quot;bfi_34&quot;, &quot;bfi_39&quot;,
+                                 &quot;-bfi_44&quot;, &quot;-bfi_49&quot;, &quot;bfi_54&quot;, &quot;bfi_59&quot;),
+                 extraversion = c(&quot;bfi_1&quot;, &quot;bfi_6&quot;, &quot;-bfi_11&quot;, &quot;-bfi_16&quot;, 
+                                  &quot;bfi_21&quot;, &quot;-bfi_26&quot;, &quot;-bfi_31&quot;, &quot;-bfi_36&quot;, 
+                                  &quot;bfi_41&quot;, &quot;bfi_46&quot;, &quot;-bfi_51&quot;, &quot;bfi_56&quot;),
+                 openness = c(&quot;-bfi_5&quot;, &quot;bfi_10&quot;, &quot;bfi_15&quot;, &quot;bfi_20&quot;, 
+                              &quot;-bfi_25&quot;, &quot;-bfi_30&quot;, &quot;bfi_35&quot;, &quot;bfi_40&quot;, 
+                              &quot;-bfi_45&quot;, &quot;-bfi_50&quot;, &quot;-bfi_55&quot;, &quot;bfi_60&quot;))</code></pre>
+<p>Next, I’ll score the Big Six. I’ll turn the data into long format to make things a little easier, since it’s the same scoring used for all of the Big Six ratings.</p>
+<pre class="r"><code># Lengthen Data
+study1_big6_long &lt;- 
+study1 %&gt;% 
+  select(sess_id, contains(&quot;bfi&quot;)) %&gt;% 
+  gather(variable, rating, -sess_id) %&gt;% 
+  separate(variable, 
+           c(&quot;perceiver&quot;, &quot;target&quot;, &quot;item&quot;), 
+           extra = &quot;merge&quot;) %&gt;% 
+  spread(item, rating)
+
+# Score long data and bind the scores to
+# the end of the long data, then widen it back out
+# and call it study1, replacing the raw data
+study1 &lt;- 
+  psych::scoreItems(big6_keys, 
+                    items = study1_big6_long, 
+                    impute = &quot;none&quot;) %&gt;% 
+  .[[&quot;scores&quot;]] %&gt;% 
+  cbind(study1_big6_long, .) %&gt;% 
+  gather(variable, rating, -(1:3)) %&gt;% 
+  unite(variable, perceiver, target, variable) %&gt;% 
+  spread(variable, rating) %&gt;% 
+  select(sess_id,
+         ends_with(&quot;agreeableness&quot;),
+         ends_with(&quot;conscientiousness&quot;),
+         ends_with(&quot;hp&quot;),
+         ends_with(&quot;neuroticism&quot;),
+         ends_with(&quot;extraversion&quot;),
+         ends_with(&quot;openness&quot;)) %&gt;% 
+  right_join(study1)</code></pre>
+<p>Finally, I’ll get the coefficient alphas for each subscale.</p>
+<pre class="r"><code>library(kableExtra)
+
+study1_big6_long %&gt;% 
+  mutate(rating_type = case_when(perceiver == target ~ &quot;Self&quot;,
+                               perceiver == &quot;A&quot; &amp; target == &quot;C&quot; |
+                                 perceiver == &quot;C&quot; &amp; target == &quot;A&quot; ~ &quot;P1&quot;,
+                               perceiver == &quot;B&quot; &amp; target == &quot;C&quot; |
+                                 perceiver == &quot;D&quot; &amp; target == &quot;A&quot; ~ &quot;P2&quot;)) %&gt;% 
+  split(.$rating_type) %&gt;% 
+  map_df(~ psych::scoreItems(big6_keys,
+                          items = .,
+                          impute = &quot;none&quot;) %&gt;% pluck(&quot;alpha&quot;)) %&gt;% 
+  mutate(domain = names(big6_keys),
+         domain = ifelse(domain == &quot;hp&quot;, &quot;honesty-propriety&quot;, domain)) %&gt;% 
+  gather(report, alpha, -domain) %&gt;%
+  mutate(report = fct_relevel(report, 
+                              &quot;Self&quot;,
+                              &quot;P1&quot;,
+                              &quot;P2&quot;)) %&gt;% 
+  select(report, domain, alpha) %&gt;% 
+  arrange(report) %&gt;% 
+  knitr::kable(digits = c(NA, NA, 2),
+               caption = &quot;Coefficient Alphas for Big Six Ratings Study 1&quot;,
+               format = &quot;html&quot;, escape = F) %&gt;%
+  kable_styling(&quot;striped&quot;, full_width = F)</code></pre>
+<table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+Coefficient Alphas for Big Six Ratings Study 1
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+report
+</th>
+<th style="text-align:left;">
+domain
+</th>
+<th style="text-align:right;">
+alpha
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+agreeableness
+</td>
+<td style="text-align:right;">
+0.76
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+conscientiousness
+</td>
+<td style="text-align:right;">
+0.83
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+honesty-propriety
+</td>
+<td style="text-align:right;">
+0.61
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+neuroticism
+</td>
+<td style="text-align:right;">
+0.89
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+extraversion
+</td>
+<td style="text-align:right;">
+0.87
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+openness
+</td>
+<td style="text-align:right;">
+0.81
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+agreeableness
+</td>
+<td style="text-align:right;">
+0.80
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+conscientiousness
+</td>
+<td style="text-align:right;">
+0.83
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+honesty-propriety
+</td>
+<td style="text-align:right;">
+0.66
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+neuroticism
+</td>
+<td style="text-align:right;">
+0.75
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+extraversion
+</td>
+<td style="text-align:right;">
+0.88
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+openness
+</td>
+<td style="text-align:right;">
+0.78
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+agreeableness
+</td>
+<td style="text-align:right;">
+0.84
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+conscientiousness
+</td>
+<td style="text-align:right;">
+0.89
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+honesty-propriety
+</td>
+<td style="text-align:right;">
+0.75
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+neuroticism
+</td>
+<td style="text-align:right;">
+0.87
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+extraversion
+</td>
+<td style="text-align:right;">
+0.89
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+openness
+</td>
+<td style="text-align:right;">
+0.83
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="study-1-data-calculate-scale-scores-iri" class="section level3">
+<h3>Study 1 Data: Calculate scale scores: IRI</h3>
+<ul>
+<li><p>Empathic Concern = q2_emp, q4_empr, q9_emp, q14_empr, q18_empr, q20_emp, q22_emp</p></li>
+<li><p>Fantasy Scale = q1_fs, q5_fs, q7_fsr, q12_fsr, q16_fs, q23_fs, q26_fs</p></li>
+<li><p>Personal Distress = q6_pd, q10_pd, q13_pdr, q17_pd, q19_pdr, q24_pd, q27_pd</p></li>
+<li><p>Perspective Taking = q3_ptr, q8_pt, q11_pt, q15_ptr, q21_pt, q25_pt, q28_pt</p></li>
+</ul>
+<p>Using the <code>scoreItems()</code> function from the psych package again. Then, Ill save out and cbind the scores to the data, and produce a table for the alphas.</p>
+<p>First make the key:</p>
+<pre class="r"><code>iri_keys &lt;- list(
+  iri_empathic = c(&quot;q2_emp&quot;, &quot;-q4_emp&quot;, &quot;q9_emp&quot;, &quot;-q14_emp&quot;, &quot;-q18_emp&quot;, &quot;q20_emp&quot;, &quot;q22_emp&quot;),
+  iri_fantasy = c(&quot;q1_fs&quot;, &quot;q5_fs&quot;, &quot;-q7_fs&quot;, &quot;-q12_fs&quot;, &quot;q16_fs&quot;, &quot;q23_fs&quot;, &quot;q26_fs&quot;),
+  iri_distress = c(&quot;q6_pd&quot;, &quot;q10_pd&quot;, &quot;-q13_pd&quot;, &quot;q17_pd&quot;, &quot;-q19_pd&quot;, &quot;q24_pd&quot;, &quot;q27_pd&quot;),
+  iri_perspective = c(&quot;-q3_pt&quot;, &quot;q8_pt&quot;, &quot;q11_pt&quot;, &quot;-q15_pt&quot;, &quot;q21_pt&quot;, &quot;q25_pt&quot;, &quot;q28_pt&quot;)
+)</code></pre>
+<p>Next, I’ll score the IRI. I’ll turn the data into long format like above with the Big Six.</p>
+<pre class="r"><code># Lengthen Data
+study1_iri_long &lt;- 
+study1 %&gt;% 
+  select(sess_id, starts_with(&quot;B_q&quot;), starts_with(&quot;D_q&quot;)) %&gt;% 
+  gather(variable, rating, -sess_id) %&gt;% 
+  separate(variable, 
+           c(&quot;perceiver&quot;, &quot;item&quot;), 
+           extra = &quot;merge&quot;) %&gt;% 
+  spread(item, rating)
+
+# Score long data and bind the scores to
+# the end of the long data, then widen it back out
+# and call it study1, replacing the raw data
+study1 &lt;- 
+  psych::scoreItems(iri_keys, 
+                    items = study1_iri_long, 
+                    impute = &quot;none&quot;) %&gt;% 
+  .[[&quot;scores&quot;]] %&gt;% 
+  cbind(study1_iri_long, .) %&gt;% 
+  gather(variable, rating, -(1:3)) %&gt;% 
+  unite(variable, perceiver, variable) %&gt;% 
+  spread(variable, rating) %&gt;% 
+  select(sess_id, contains(&quot;iri&quot;)) %&gt;% 
+  right_join(study1)</code></pre>
+<p>Finally, I’ll get the coefficient alphas for each subscale.</p>
+<pre class="r"><code>library(kableExtra)
+
+ psych::scoreItems(iri_keys, 
+                    items = study1_iri_long, 
+                    impute = &quot;none&quot;) %&gt;% 
+  .[[&quot;alpha&quot;]] %&gt;% 
+   as_tibble() %&gt;% 
+   gather(subscale, alpha) %&gt;% 
+   mutate(subscale =
+            case_when(subscale == &quot;iri_empathic&quot; ~ &quot;empathic concern&quot;,
+                      subscale == &quot;iri_fantasy&quot; ~ &quot;fantasy&quot;,
+                      subscale == &quot;iri_distress&quot; ~ &quot;distress tolerance&quot;,
+                      subscale == &quot;iri_perspective&quot; ~ &quot;perspective taking&quot;)) %&gt;% 
+  knitr::kable(digits = c(NA, 2),
+               caption = &quot;Coefficient Alphas for Perspective Taking Study 1&quot;,
+               format = &quot;html&quot;, escape = F) %&gt;%
+  kable_styling(&quot;striped&quot;, full_width = F)</code></pre>
+<table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+Coefficient Alphas for Perspective Taking Study 1
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+subscale
+</th>
+<th style="text-align:right;">
+alpha
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+empathic concern
+</td>
+<td style="text-align:right;">
+0.73
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+fantasy
+</td>
+<td style="text-align:right;">
+0.82
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+distress tolerance
+</td>
+<td style="text-align:right;">
+0.82
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+perspective taking
+</td>
+<td style="text-align:right;">
+0.76
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="study-2-data-score-big-six-domains" class="section level3">
+<h3>Study 2 Data: Score Big Six Domains</h3>
+<p>Same scoring &amp; keys as Study 2. Basically just the dataframes are different, and the rest is the same.</p>
+<pre class="r"><code># Lengthen Data
+study2_big6_long &lt;- 
+study2 %&gt;% 
+  select(sess_id, contains(&quot;bfi&quot;)) %&gt;% 
+  gather(variable, rating, -sess_id) %&gt;% 
+  separate(variable, 
+           c(&quot;perceiver&quot;, &quot;target&quot;, &quot;item&quot;), 
+           extra = &quot;merge&quot;) %&gt;% 
+  spread(item, rating)
+
+# Score long data and bind the scores to
+# the end of the long data, then widen it back out
+# and call it study2, replacing the raw data
+study2 &lt;- 
+  psych::scoreItems(big6_keys, 
+                    items = study2_big6_long, 
+                    impute = &quot;none&quot;) %&gt;% 
+  .[[&quot;scores&quot;]] %&gt;% 
+  cbind(study2_big6_long, .) %&gt;% 
+  gather(variable, rating, -(1:3)) %&gt;% 
+  unite(variable, perceiver, target, variable) %&gt;% 
+  spread(variable, rating) %&gt;% 
+  select(sess_id,
+         ends_with(&quot;agreeableness&quot;),
+         ends_with(&quot;conscientiousness&quot;),
+         ends_with(&quot;hp&quot;),
+         ends_with(&quot;neuroticism&quot;),
+         ends_with(&quot;extraversion&quot;),
+         ends_with(&quot;openness&quot;)) %&gt;% 
+  right_join(study2)</code></pre>
+<p>Finally, I’ll get the coefficient alphas for each subscale.</p>
+<pre class="r"><code>library(kableExtra)
+
+study2_big6_long %&gt;% 
+  mutate(rating_type = case_when(perceiver == target ~ &quot;Self&quot;,
+                               perceiver == &quot;A&quot; &amp; target == &quot;C&quot; |
+                                 perceiver == &quot;C&quot; &amp; target == &quot;A&quot; ~ &quot;P1&quot;,
+                               perceiver == &quot;B&quot; &amp; target == &quot;C&quot; |
+                                 perceiver == &quot;D&quot; &amp; target == &quot;A&quot; ~ &quot;P2&quot;)) %&gt;% 
+  split(.$rating_type) %&gt;% 
+  map_df(~ psych::scoreItems(big6_keys,
+                          items = .,
+                          impute = &quot;none&quot;) %&gt;% pluck(&quot;alpha&quot;)) %&gt;% 
+  mutate(domain = names(big6_keys),
+         domain = ifelse(domain == &quot;hp&quot;, &quot;honesty-propriety&quot;, domain)) %&gt;% 
+  gather(report, alpha, -domain) %&gt;%
+  mutate(report = fct_relevel(report, 
+                              &quot;Self&quot;,
+                              &quot;P1&quot;,
+                              &quot;P2&quot;)) %&gt;% 
+  select(report, domain, alpha) %&gt;% 
+  arrange(report) %&gt;% 
+  knitr::kable(digits = c(NA, NA, 2),
+               caption = &quot;Coefficient Alphas for Big Six Ratings Study 2&quot;,
+               format = &quot;html&quot;, escape = F) %&gt;%
+  kable_styling(&quot;striped&quot;, full_width = F)</code></pre>
+<table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+Coefficient Alphas for Big Six Ratings Study 2
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+report
+</th>
+<th style="text-align:left;">
+domain
+</th>
+<th style="text-align:right;">
+alpha
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+agreeableness
+</td>
+<td style="text-align:right;">
+0.76
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+conscientiousness
+</td>
+<td style="text-align:right;">
+0.86
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+honesty-propriety
+</td>
+<td style="text-align:right;">
+0.62
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+neuroticism
+</td>
+<td style="text-align:right;">
+0.88
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+extraversion
+</td>
+<td style="text-align:right;">
+0.87
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Self
+</td>
+<td style="text-align:left;">
+openness
+</td>
+<td style="text-align:right;">
+0.81
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+agreeableness
+</td>
+<td style="text-align:right;">
+0.82
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+conscientiousness
+</td>
+<td style="text-align:right;">
+0.88
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+honesty-propriety
+</td>
+<td style="text-align:right;">
+0.76
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+neuroticism
+</td>
+<td style="text-align:right;">
+0.84
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+extraversion
+</td>
+<td style="text-align:right;">
+0.88
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P1
+</td>
+<td style="text-align:left;">
+openness
+</td>
+<td style="text-align:right;">
+0.87
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+agreeableness
+</td>
+<td style="text-align:right;">
+0.83
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+conscientiousness
+</td>
+<td style="text-align:right;">
+0.91
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+honesty-propriety
+</td>
+<td style="text-align:right;">
+0.79
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+neuroticism
+</td>
+<td style="text-align:right;">
+0.83
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+extraversion
+</td>
+<td style="text-align:right;">
+0.91
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+P2
+</td>
+<td style="text-align:left;">
+openness
+</td>
+<td style="text-align:right;">
+0.77
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="study-2-data-calculate-scale-scores-iri" class="section level3">
+<h3>Study 2 Data: Calculate scale scores: IRI</h3>
+<p>Same keys as before</p>
+<p>Next, I’ll score the IRI. I’ll turn the data into long format like above with the Big Six.</p>
+<pre class="r"><code># Lengthen Data
+study2_iri_long &lt;- 
+study2 %&gt;% 
+  select(sess_id, starts_with(&quot;B_q&quot;), starts_with(&quot;D_q&quot;)) %&gt;% 
+  gather(variable, rating, -sess_id) %&gt;% 
+  separate(variable, 
+           c(&quot;perceiver&quot;, &quot;item&quot;), 
+           extra = &quot;merge&quot;) %&gt;% 
+  spread(item, rating)
+
+# Score long data and bind the scores to
+# the end of the long data, then widen it back out
+# and call it study2, replacing the raw data
+study2 &lt;- 
+  psych::scoreItems(iri_keys, 
+                    items = study2_iri_long, 
+                    impute = &quot;none&quot;) %&gt;% 
+  .[[&quot;scores&quot;]] %&gt;% 
+  cbind(study2_iri_long, .) %&gt;% 
+  gather(variable, rating, -(1:3)) %&gt;% 
+  unite(variable, perceiver, variable) %&gt;% 
+  spread(variable, rating) %&gt;% 
+  select(sess_id, contains(&quot;iri&quot;)) %&gt;% 
+  right_join(study2)</code></pre>
+<p>Finally, I’ll get the coefficient alphas for each subscale.</p>
+<pre class="r"><code>library(kableExtra)
+
+ psych::scoreItems(iri_keys, 
+                    items = study2_iri_long, 
+                    impute = &quot;none&quot;) %&gt;% 
+  .[[&quot;alpha&quot;]] %&gt;% 
+   as_tibble() %&gt;% 
+   gather(subscale, alpha) %&gt;% 
+   mutate(subscale =
+            case_when(subscale == &quot;iri_empathic&quot; ~ &quot;empathic concern&quot;,
+                      subscale == &quot;iri_fantasy&quot; ~ &quot;fantasy&quot;,
+                      subscale == &quot;iri_distress&quot; ~ &quot;distress tolerance&quot;,
+                      subscale == &quot;iri_perspective&quot; ~ &quot;perspective taking&quot;)) %&gt;% 
+  knitr::kable(digits = c(NA, 2),
+               caption = &quot;Coefficient Alphas for Perspective Taking Study 2&quot;,
+               format = &quot;html&quot;, escape = F) %&gt;%
+  kable_styling(&quot;striped&quot;, full_width = F)</code></pre>
+<table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+Coefficient Alphas for Perspective Taking Study 2
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+subscale
+</th>
+<th style="text-align:right;">
+alpha
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+empathic concern
+</td>
+<td style="text-align:right;">
+0.70
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+fantasy
+</td>
+<td style="text-align:right;">
+0.82
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+distress tolerance
+</td>
+<td style="text-align:right;">
+0.78
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+perspective taking
+</td>
+<td style="text-align:right;">
+0.75
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="individual-difference-moderator-data-prep-study-1" class="section level2">
+<h2>Individual Difference Moderator Data Prep Study 1</h2>
+<p>Next up, prepping data for the individual difference moderators. These analyses require first mean-centering predictors and creating interaction terms, which the next chunk of code does.</p>
+<pre class="r"><code>study1 &lt;-
+study1 %&gt;%
+  # First, mean center the predictors, 
+  # since this is a continuous by continuous interaction.
+  # We&#39;ll do this scale()
+  mutate(
+    # first, mean center P2 ratings for each domain
+    B_C_extraversion_cent      = scale(B_C_extraversion, scale = FALSE),
+    D_A_extraversion_cent      = scale(D_A_extraversion, scale = FALSE),
+    B_C_agreeableness_cent     = scale(B_C_agreeableness, scale = FALSE),
+    D_A_agreeableness_cent     = scale(D_A_agreeableness, scale = FALSE),
+    B_C_conscientiousness_cent = scale(B_C_conscientiousness, scale = FALSE),
+    D_A_conscientiousness_cent = scale(D_A_conscientiousness, scale = FALSE),
+    B_C_neuroticism_cent       = scale(B_C_neuroticism, scale = FALSE),
+    D_A_neuroticism_cent       = scale(D_A_neuroticism, scale = FALSE),
+    B_C_openness_cent          = scale(B_C_openness, scale = FALSE),
+    D_A_openness_cent          = scale(D_A_openness, scale = FALSE),
+    B_C_hp_cent                = scale(B_C_hp, scale = FALSE),
+    D_A_hp_cent                = scale(D_A_hp, scale = FALSE),
+    # next, mean center empathy subscales (only have B and D for this)
+    # this is a proposed moderator of consensus/accuracy
+    B_iri_perspective_cent     = scale(B_iri_perspective, scale = FALSE),
+    D_iri_perspective_cent     = scale(D_iri_perspective, scale = FALSE),
+    B_iri_empathic_cent        = scale(B_iri_empathic, scale = FALSE),
+    D_iri_empathic_cent        = scale(D_iri_empathic, scale = FALSE),
+    B_iri_distress_cent        = scale(B_iri_distress, scale = FALSE),
+    D_iri_distress_cent        = scale(D_iri_distress, scale = FALSE),
+    B_iri_fantasy_cent         = scale(B_iri_fantasy, scale = FALSE),
+    D_iri_fantasy_cent         = scale(D_iri_fantasy, scale = FALSE),
+    # mean center self-reported extraversion
+    # this is a proposed moderator of consensus/accuracy
+    A_A_extraversion_cent      = scale(A_A_extraversion, scale = FALSE),
+    C_C_extraversion_cent      = scale(C_C_extraversion, scale = FALSE),
+    A_C_extraversion_cent      = scale(A_C_extraversion, scale = FALSE),
+    C_A_extraversion_cent      = scale(C_A_extraversion, scale = FALSE),
+    B_B_extraversion_cent      = scale(B_B_extraversion, scale = FALSE),
+    D_D_extraversion_cent      = scale(D_D_extraversion, scale = FALSE)) %&gt;% 
+  # Next, create interaction terms
+  mutate(
+    # Extraversion moderators (for extraversion)
+    extraXextra_AB = A_A_extraversion_cent*B_C_extraversion_cent,
+    extraXextra_CD = C_C_extraversion_cent*D_A_extraversion_cent,
+    extraXextra_BB = B_B_extraversion_cent*B_C_extraversion_cent,
+    extraXextra_DD = D_D_extraversion_cent*D_A_extraversion_cent,
+    extraXextra_CB = C_C_extraversion_cent*B_C_extraversion_cent,
+    extraXextra_AD = A_A_extraversion_cent*D_A_extraversion_cent,
+    # Extraversion moderators (for agreeableness)
+    extraXagree_AB = A_A_extraversion_cent*B_C_agreeableness_cent,
+    extraXagree_CD = C_C_extraversion_cent*D_A_agreeableness_cent,
+    extraXagree_BB = B_B_extraversion_cent*B_C_agreeableness_cent,
+    extraXagree_DD = D_D_extraversion_cent*D_A_agreeableness_cent,
+    extraXagree_CB = C_C_extraversion_cent*B_C_agreeableness_cent,
+    extraXagree_AD = A_A_extraversion_cent*D_A_agreeableness_cent,
+    # Extraversion moderators (for conscientiousness)
+    extraXconsc_AB = A_A_extraversion_cent*B_C_conscientiousness_cent,
+    extraXconsc_CD = C_C_extraversion_cent*D_A_conscientiousness_cent,
+    extraXconsc_BB = B_B_extraversion_cent*B_C_conscientiousness_cent,
+    extraXconsc_DD = D_D_extraversion_cent*D_A_conscientiousness_cent,
+    extraXconsc_CB = C_C_extraversion_cent*B_C_conscientiousness_cent,
+    extraXconsc_AD = A_A_extraversion_cent*D_A_conscientiousness_cent,
+    # Extraversion moderators (for Neuroticism)
+    extraXneuro_AB = A_A_extraversion_cent*B_C_neuroticism_cent,
+    extraXneuro_CD = C_C_extraversion_cent*D_A_neuroticism_cent,
+    extraXneuro_BB = B_B_extraversion_cent*B_C_neuroticism_cent,
+    extraXneuro_DD = D_D_extraversion_cent*D_A_neuroticism_cent,
+    extraXneuro_CB = C_C_extraversion_cent*B_C_neuroticism_cent,
+    extraXneuro_AD = A_A_extraversion_cent*D_A_neuroticism_cent,
+    # Extraversion moderators (for Openness)
+    extraXopen_AB = A_A_extraversion_cent*B_C_openness_cent,
+    extraXopen_CD = C_C_extraversion_cent*D_A_openness_cent,
+    extraXopen_BB = B_B_extraversion_cent*B_C_openness_cent,
+    extraXopen_DD = D_D_extraversion_cent*D_A_openness_cent,
+    extraXopen_CB = C_C_extraversion_cent*B_C_openness_cent,
+    extraXopen_AD = A_A_extraversion_cent*D_A_openness_cent,
+    # Extraversion moderators (for HP)
+    extraXhp_AB = A_A_extraversion_cent*B_C_hp_cent,
+    extraXhp_CD = C_C_extraversion_cent*D_A_hp_cent,
+    extraXhp_BB = B_B_extraversion_cent*B_C_hp_cent,
+    extraXhp_DD = D_D_extraversion_cent*D_A_hp_cent,
+    extraXhp_CB = C_C_extraversion_cent*B_C_hp_cent,
+    extraXhp_AD = A_A_extraversion_cent*D_A_hp_cent,
+    # perspective taking moderators (for extraversion)
+    PTxE_B = B_iri_perspective_cent*B_C_extraversion_cent,
+    PTxE_D = D_iri_perspective_cent*D_A_extraversion_cent,
+    # perspective taking moderators (for agreeableness)
+    PTxA_B = B_iri_perspective_cent*B_C_agreeableness_cent,
+    PTxA_D = D_iri_perspective_cent*D_A_agreeableness_cent,
+    # perspective taking moderators (for conscientiousness)
+    PTxC_B = B_iri_perspective_cent*B_C_conscientiousness_cent,
+    PTxC_D = D_iri_perspective_cent*D_A_conscientiousness_cent,
+    # perspective taking moderators (for neuroticism)
+    PTxN_B = B_iri_perspective_cent*B_C_neuroticism_cent,
+    PTxN_D = D_iri_perspective_cent*D_A_neuroticism_cent,
+    # perspective taking moderators (for openness)
+    PTxO_B = B_iri_perspective_cent*B_C_openness_cent,
+    PTxO_D = D_iri_perspective_cent*D_A_openness_cent,
+    # perspective taking moderators (for hp)
+    PTxHP_B = B_iri_perspective_cent*B_C_hp_cent,
+    PTxHP_D = D_iri_perspective_cent*D_A_hp_cent,
+    # empathic concern moderators (for extraversion)
+    empxE_B = B_iri_empathic_cent*B_C_extraversion_cent,
+    empxE_D = D_iri_empathic_cent*D_A_extraversion_cent,
+    # empathic concern moderators (for agreeableness)
+    empxA_B = B_iri_empathic_cent*B_C_agreeableness_cent,
+    empxA_D = D_iri_empathic_cent*D_A_agreeableness_cent,
+    # empathic concern moderators (for conscientiousness)
+    empxC_B = B_iri_empathic_cent*B_C_conscientiousness_cent,
+    empxC_D = D_iri_empathic_cent*D_A_conscientiousness_cent,
+    # empathic concern moderators (for neuroticism)
+    empxN_B = B_iri_empathic_cent*B_C_neuroticism_cent,
+    empxN_D = D_iri_empathic_cent*D_A_neuroticism_cent,
+    # empathic concern moderators (for openness)
+    empxO_B = B_iri_empathic_cent*B_C_openness_cent,
+    empxO_D = D_iri_empathic_cent*D_A_openness_cent,
+    # empathic concern moderators (for hp)
+    empxHP_B = B_iri_empathic_cent*B_C_hp_cent,
+    empxHP_D = D_iri_empathic_cent*D_A_hp_cent,
+    # personal distress moderators (for extraversion)
+    disxE_B = B_iri_distress_cent*B_C_extraversion_cent,
+    disxE_D = D_iri_distress_cent*D_A_extraversion_cent,
+    # personal distress moderators (for agreeableness)
+    disxA_B = B_iri_distress_cent*B_C_agreeableness_cent,
+    disxA_D = D_iri_distress_cent*D_A_agreeableness_cent,
+    # personal distress moderators (for conscientiousness)
+    disxC_B = B_iri_distress_cent*B_C_conscientiousness_cent,
+    disxC_D = D_iri_distress_cent*D_A_conscientiousness_cent,
+    # personal distress moderators (for neuroticism)
+    disxN_B = B_iri_distress_cent*B_C_neuroticism_cent,
+    disxN_D = D_iri_distress_cent*D_A_neuroticism_cent,
+    # personal distress moderators (for openness)
+    disxO_B = B_iri_distress_cent*B_C_openness_cent,
+    disxO_D = D_iri_distress_cent*D_A_openness_cent,
+    # personal distress moderators (for hp)
+    disxHP_B = B_iri_distress_cent*B_C_hp_cent,
+    disxHP_D = D_iri_distress_cent*D_A_hp_cent,
+    # fantasy moderators (for extraversion)
+    fantxE_B = B_iri_fantasy_cent*B_C_extraversion_cent,
+    fantxE_D = D_iri_fantasy_cent*D_A_extraversion_cent,
+    # fantasy moderators (for agreeableness)
+    fantxA_B = B_iri_fantasy_cent*B_C_agreeableness_cent,
+    fantxA_D = D_iri_fantasy_cent*D_A_agreeableness_cent,
+    # fantasy moderators (for conscientiousness)
+    fantxC_B = B_iri_fantasy_cent*B_C_conscientiousness_cent,
+    fantxC_D = D_iri_fantasy_cent*D_A_conscientiousness_cent,
+    # fantasy moderators (for neuroticism)
+    fantxN_B = B_iri_fantasy_cent*B_C_neuroticism_cent,
+    fantxN_D = D_iri_fantasy_cent*D_A_neuroticism_cent,
+    # fantasy moderators (for openness)
+    fantxO_B = B_iri_fantasy_cent*B_C_openness_cent,
+    fantxO_D = D_iri_fantasy_cent*D_A_openness_cent,
+    # fantasy moderators (for hp)
+    fantxHP_B = B_iri_fantasy_cent*B_C_hp_cent,
+    fantxHP_D = D_iri_fantasy_cent*D_A_hp_cent)</code></pre>
+</div>
+<div id="individual-difference-moderator-data-prep-in-study-2" class="section level2">
+<h2>Individual Difference Moderator Data Prep in Study 2</h2>
+<p>Next, prep for the individual difference moderators for Study 2, same as Study 1.</p>
+<pre class="r"><code>study2 &lt;-
+study2 %&gt;%
+  # First, mean center the predictors, 
+  # since this is a continuous by continuous interaction.
+  # We&#39;ll do this scale()
+  mutate(
+    # first, mean center P2 ratings for each domain
+    B_C_extraversion_cent      = scale(B_C_extraversion, scale = FALSE),
+    D_A_extraversion_cent      = scale(D_A_extraversion, scale = FALSE),
+    B_C_agreeableness_cent     = scale(B_C_agreeableness, scale = FALSE),
+    D_A_agreeableness_cent     = scale(D_A_agreeableness, scale = FALSE),
+    B_C_conscientiousness_cent = scale(B_C_conscientiousness, scale = FALSE),
+    D_A_conscientiousness_cent = scale(D_A_conscientiousness, scale = FALSE),
+    B_C_neuroticism_cent       = scale(B_C_neuroticism, scale = FALSE),
+    D_A_neuroticism_cent       = scale(D_A_neuroticism, scale = FALSE),
+    B_C_openness_cent          = scale(B_C_openness, scale = FALSE),
+    D_A_openness_cent          = scale(D_A_openness, scale = FALSE),
+    B_C_hp_cent                = scale(B_C_hp, scale = FALSE),
+    D_A_hp_cent                = scale(D_A_hp, scale = FALSE),
+    # next, mean center empathy subscales (only have B and D for this)
+    # this is a proposed moderator of consensus/accuracy
+    B_iri_perspective_cent     = scale(B_iri_perspective, scale = FALSE),
+    D_iri_perspective_cent     = scale(D_iri_perspective, scale = FALSE),
+    B_iri_empathic_cent        = scale(B_iri_empathic, scale = FALSE),
+    D_iri_empathic_cent        = scale(D_iri_empathic, scale = FALSE),
+    B_iri_distress_cent        = scale(B_iri_distress, scale = FALSE),
+    D_iri_distress_cent        = scale(D_iri_distress, scale = FALSE),
+    B_iri_fantasy_cent         = scale(B_iri_fantasy, scale = FALSE),
+    D_iri_fantasy_cent         = scale(D_iri_fantasy, scale = FALSE),
+    # mean center self-reported extraversion
+    # this is a proposed moderator of consensus/accuracy
+    A_A_extraversion_cent      = scale(A_A_extraversion, scale = FALSE),
+    C_C_extraversion_cent      = scale(C_C_extraversion, scale = FALSE),
+    A_C_extraversion_cent      = scale(A_C_extraversion, scale = FALSE),
+    C_A_extraversion_cent      = scale(C_A_extraversion, scale = FALSE),
+    B_B_extraversion_cent      = scale(B_B_extraversion, scale = FALSE),
+    D_D_extraversion_cent      = scale(D_D_extraversion, scale = FALSE)) %&gt;% 
+  # Next, create interaction terms
+  mutate(
+    # Extraversion moderators (for extraversion)
+    extraXextra_AB = A_A_extraversion_cent*B_C_extraversion_cent,
+    extraXextra_CD = C_C_extraversion_cent*D_A_extraversion_cent,
+    extraXextra_BB = B_B_extraversion_cent*B_C_extraversion_cent,
+    extraXextra_DD = D_D_extraversion_cent*D_A_extraversion_cent,
+    extraXextra_CB = C_C_extraversion_cent*B_C_extraversion_cent,
+    extraXextra_AD = A_A_extraversion_cent*D_A_extraversion_cent,
+    # Extraversion moderators (for agreeableness)
+    extraXagree_AB = A_A_extraversion_cent*B_C_agreeableness_cent,
+    extraXagree_CD = C_C_extraversion_cent*D_A_agreeableness_cent,
+    extraXagree_BB = B_B_extraversion_cent*B_C_agreeableness_cent,
+    extraXagree_DD = D_D_extraversion_cent*D_A_agreeableness_cent,
+    extraXagree_CB = C_C_extraversion_cent*B_C_agreeableness_cent,
+    extraXagree_AD = A_A_extraversion_cent*D_A_agreeableness_cent,
+    # Extraversion moderators (for conscientiousness)
+    extraXconsc_AB = A_A_extraversion_cent*B_C_conscientiousness_cent,
+    extraXconsc_CD = C_C_extraversion_cent*D_A_conscientiousness_cent,
+    extraXconsc_BB = B_B_extraversion_cent*B_C_conscientiousness_cent,
+    extraXconsc_DD = D_D_extraversion_cent*D_A_conscientiousness_cent,
+    extraXconsc_CB = C_C_extraversion_cent*B_C_conscientiousness_cent,
+    extraXconsc_AD = A_A_extraversion_cent*D_A_conscientiousness_cent,
+    # Extraversion moderators (for Neuroticism)
+    extraXneuro_AB = A_A_extraversion_cent*B_C_neuroticism_cent,
+    extraXneuro_CD = C_C_extraversion_cent*D_A_neuroticism_cent,
+    extraXneuro_BB = B_B_extraversion_cent*B_C_neuroticism_cent,
+    extraXneuro_DD = D_D_extraversion_cent*D_A_neuroticism_cent,
+    extraXneuro_CB = C_C_extraversion_cent*B_C_neuroticism_cent,
+    extraXneuro_AD = A_A_extraversion_cent*D_A_neuroticism_cent,
+    # Extraversion moderators (for Openness)
+    extraXopen_AB = A_A_extraversion_cent*B_C_openness_cent,
+    extraXopen_CD = C_C_extraversion_cent*D_A_openness_cent,
+    extraXopen_BB = B_B_extraversion_cent*B_C_openness_cent,
+    extraXopen_DD = D_D_extraversion_cent*D_A_openness_cent,
+    extraXopen_CB = C_C_extraversion_cent*B_C_openness_cent,
+    extraXopen_AD = A_A_extraversion_cent*D_A_openness_cent,
+    # Extraversion moderators (for HP)
+    extraXhp_AB = A_A_extraversion_cent*B_C_hp_cent,
+    extraXhp_CD = C_C_extraversion_cent*D_A_hp_cent,
+    extraXhp_BB = B_B_extraversion_cent*B_C_hp_cent,
+    extraXhp_DD = D_D_extraversion_cent*D_A_hp_cent,
+    extraXhp_CB = C_C_extraversion_cent*B_C_hp_cent,
+    extraXhp_AD = A_A_extraversion_cent*D_A_hp_cent,
+    # perspective taking moderators (for extraversion)
+    PTxE_B = B_iri_perspective_cent*B_C_extraversion_cent,
+    PTxE_D = D_iri_perspective_cent*D_A_extraversion_cent,
+    # perspective taking moderators (for agreeableness)
+    PTxA_B = B_iri_perspective_cent*B_C_agreeableness_cent,
+    PTxA_D = D_iri_perspective_cent*D_A_agreeableness_cent,
+    # perspective taking moderators (for conscientiousness)
+    PTxC_B = B_iri_perspective_cent*B_C_conscientiousness_cent,
+    PTxC_D = D_iri_perspective_cent*D_A_conscientiousness_cent,
+    # perspective taking moderators (for neuroticism)
+    PTxN_B = B_iri_perspective_cent*B_C_neuroticism_cent,
+    PTxN_D = D_iri_perspective_cent*D_A_neuroticism_cent,
+    # perspective taking moderators (for openness)
+    PTxO_B = B_iri_perspective_cent*B_C_openness_cent,
+    PTxO_D = D_iri_perspective_cent*D_A_openness_cent,
+    # perspective taking moderators (for hp)
+    PTxHP_B = B_iri_perspective_cent*B_C_hp_cent,
+    PTxHP_D = D_iri_perspective_cent*D_A_hp_cent,
+    # empathic concern moderators (for extraversion)
+    empxE_B = B_iri_empathic_cent*B_C_extraversion_cent,
+    empxE_D = D_iri_empathic_cent*D_A_extraversion_cent,
+    # empathic concern moderators (for agreeableness)
+    empxA_B = B_iri_empathic_cent*B_C_agreeableness_cent,
+    empxA_D = D_iri_empathic_cent*D_A_agreeableness_cent,
+    # empathic concern moderators (for conscientiousness)
+    empxC_B = B_iri_empathic_cent*B_C_conscientiousness_cent,
+    empxC_D = D_iri_empathic_cent*D_A_conscientiousness_cent,
+    # empathic concern moderators (for neuroticism)
+    empxN_B = B_iri_empathic_cent*B_C_neuroticism_cent,
+    empxN_D = D_iri_empathic_cent*D_A_neuroticism_cent,
+    # empathic concern moderators (for openness)
+    empxO_B = B_iri_empathic_cent*B_C_openness_cent,
+    empxO_D = D_iri_empathic_cent*D_A_openness_cent,
+    # empathic concern moderators (for hp)
+    empxHP_B = B_iri_empathic_cent*B_C_hp_cent,
+    empxHP_D = D_iri_empathic_cent*D_A_hp_cent,
+    # personal distress moderators (for extraversion)
+    disxE_B = B_iri_distress_cent*B_C_extraversion_cent,
+    disxE_D = D_iri_distress_cent*D_A_extraversion_cent,
+    # personal distress moderators (for agreeableness)
+    disxA_B = B_iri_distress_cent*B_C_agreeableness_cent,
+    disxA_D = D_iri_distress_cent*D_A_agreeableness_cent,
+    # personal distress moderators (for conscientiousness)
+    disxC_B = B_iri_distress_cent*B_C_conscientiousness_cent,
+    disxC_D = D_iri_distress_cent*D_A_conscientiousness_cent,
+    # personal distress moderators (for neuroticism)
+    disxN_B = B_iri_distress_cent*B_C_neuroticism_cent,
+    disxN_D = D_iri_distress_cent*D_A_neuroticism_cent,
+    # personal distress moderators (for openness)
+    disxO_B = B_iri_distress_cent*B_C_openness_cent,
+    disxO_D = D_iri_distress_cent*D_A_openness_cent,
+    # personal distress moderators (for hp)
+    disxHP_B = B_iri_distress_cent*B_C_hp_cent,
+    disxHP_D = D_iri_distress_cent*D_A_hp_cent,
+    # fantasy moderators (for extraversion)
+    fantxE_B = B_iri_fantasy_cent*B_C_extraversion_cent,
+    fantxE_D = D_iri_fantasy_cent*D_A_extraversion_cent,
+    # fantasy moderators (for agreeableness)
+    fantxA_B = B_iri_fantasy_cent*B_C_agreeableness_cent,
+    fantxA_D = D_iri_fantasy_cent*D_A_agreeableness_cent,
+    # fantasy moderators (for conscientiousness)
+    fantxC_B = B_iri_fantasy_cent*B_C_conscientiousness_cent,
+    fantxC_D = D_iri_fantasy_cent*D_A_conscientiousness_cent,
+    # fantasy moderators (for neuroticism)
+    fantxN_B = B_iri_fantasy_cent*B_C_neuroticism_cent,
+    fantxN_D = D_iri_fantasy_cent*D_A_neuroticism_cent,
+    # fantasy moderators (for openness)
+    fantxO_B = B_iri_fantasy_cent*B_C_openness_cent,
+    fantxO_D = D_iri_fantasy_cent*D_A_openness_cent,
+    # fantasy moderators (for hp)
+    fantxHP_B = B_iri_fantasy_cent*B_C_hp_cent,
+    fantxHP_D = D_iri_fantasy_cent*D_A_hp_cent)</code></pre>
+</div>
+<div id="combine-data-for-integrated-analyses" class="section level2">
+<h2>Combine Data for Integrated Analyses</h2>
+<p>Last (general)</p>
+<pre class="r"><code>study1 &lt;- mutate(study1, study = &quot;study 1&quot;)
+study2 &lt;- mutate(study2, study = &quot;study 2&quot;)
+integrated &lt;- study2 %&gt;% 
+  # Remove STudy
+  .[, colnames(.) %in% colnames(study1)] %&gt;% 
+  rbind(study1) %&gt;% 
+  select(study, sess_id, everything()) %&gt;% 
+  arrange(study)</code></pre>
+</div>
 </div>
 <div id="study-1" class="section level1">
 <h1>Study 1</h1>
@@ -2888,8 +4007,8 @@ integrated &lt;- import(&quot;Data/rep_integrated_4ms.csv&quot;)</code></pre>
                   target_self = c(&quot;C_C_agreeableness&quot;, &quot;A_A_agreeableness&quot;))
 agree_elevation &lt;- ez_elevation_table(agree_model)
 agree_differential &lt;- ez_differential_table(agree_model)
-summary(agree_model)</code></pre>
-<pre><code>## lavaan 0.6-4 ended normally after 48 iterations
+summary(agree_model, standardized = TRUE)</code></pre>
+<pre><code>## lavaan 0.6-4 ended normally after 54 iterations
 ## 
 ##   Optimization method                           NLMINB
 ##   Number of free parameters                         24
@@ -2897,13 +4016,13 @@ summary(agree_model)</code></pre>
 ##   Row rank of the constraints matrix                 9
 ## 
 ##                                                   Used       Total
-##   Number of observations                            72          73
+##   Number of observations                           122         124
 ##   Number of missing patterns                         7
 ## 
 ##   Estimator                                         ML
-##   Model Fit Test Statistic                      23.761
+##   Model Fit Test Statistic                      37.378
 ##   Degrees of freedom                                12
-##   P-value (Chi-square)                           0.022
+##   P-value (Chi-square)                           0.000
 ## 
 ## Parameter Estimates:
 ## 
@@ -2912,54 +4031,78 @@ summary(agree_model)</code></pre>
 ##   Standard Errors                             Standard
 ## 
 ## Covariances:
-##                        Estimate  Std.Err  z-value  P(&gt;|z|)
-##   A_C_agreeableness ~~                                    
-##     B_C_grb   (hc)        0.054    0.027    1.998    0.046
-##   C_A_agreeableness ~~                                    
-##     D_A_grb   (hc)        0.054    0.027    1.998    0.046
-##   C_C_agreeableness ~~                                    
-##     B_C_grb   (ha)        0.052    0.030    1.720    0.085
-##   A_A_agreeableness ~~                                    
-##     D_A_grb   (ha)        0.052    0.030    1.720    0.085
-##   A_C_agreeableness ~~                                    
-##     C_C_grb   (da)        0.071    0.026    2.663    0.008
-##   C_A_agreeableness ~~                                    
-##     A_A_grb   (da)        0.071    0.026    2.663    0.008
-##   A_C_agreeableness ~~                                    
-##     D_A_grb    (m)        0.024    0.057    0.419    0.675
-##     C_A_grb  (rec)        0.007    0.032    0.216    0.829
-##   B_C_agreeableness ~~                                    
-##     D_A_grb    (h)       -0.009    0.050   -0.175    0.861
-##   C_C_agreeableness ~~                                    
-##     A_A_grb (tr_s)        0.002    0.037    0.057    0.954
-##   A_A_agreeableness ~~                                    
-##     B_C_grb (a__3)       -0.015    0.034   -0.428    0.668
-##   A_C_agreeableness ~~                                    
-##     A_A_grb (a__1)        0.072    0.042    1.705    0.088
+##                        Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv
+##   A_C_agreeableness ~~                                             
+##     B_C_grb   (hc)        0.056    0.021    2.691    0.007    0.056
+##   C_A_agreeableness ~~                                             
+##     D_A_grb   (hc)        0.056    0.021    2.691    0.007    0.056
+##   C_C_agreeableness ~~                                             
+##     B_C_grb   (ha)        0.050    0.022    2.248    0.025    0.050
+##   A_A_agreeableness ~~                                             
+##     D_A_grb   (ha)        0.050    0.022    2.248    0.025    0.050
+##   A_C_agreeableness ~~                                             
+##     C_C_grb   (da)        0.067    0.019    3.496    0.000    0.067
+##   C_A_agreeableness ~~                                             
+##     A_A_grb   (da)        0.067    0.019    3.496    0.000    0.067
+##   A_C_agreeableness ~~                                             
+##     D_A_grb    (m)        0.035    0.042    0.831    0.406    0.035
+##     C_A_grb  (rec)        0.011    0.024    0.456    0.648    0.011
+##   B_C_agreeableness ~~                                             
+##     D_A_grb    (h)       -0.034    0.038   -0.901    0.368   -0.034
+##   C_C_agreeableness ~~                                             
+##     A_A_grb (tr_s)       -0.001    0.026   -0.036    0.971   -0.001
+##   A_A_agreeableness ~~                                             
+##     B_C_grb (a__3)       -0.025    0.025   -0.988    0.323   -0.025
+##   A_C_agreeableness ~~                                             
+##     A_A_grb (a__1)        0.073    0.029    2.543    0.011    0.073
+##   Std.all
+##          
+##     0.208
+##          
+##     0.208
+##          
+##     0.169
+##          
+##     0.169
+##          
+##     0.236
+##          
+##     0.236
+##          
+##     0.129
+##     0.041
+##          
+##    -0.124
+##          
+##    -0.003
+##          
+##    -0.085
+##          
+##     0.258
 ## 
 ## Intercepts:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_grb (int_)    3.844    0.048   79.580    0.000
-##     A_A_grb (int_)    3.844    0.048   79.580    0.000
-##     A_C_grb (in_1)    3.964    0.043   91.553    0.000
-##     C_A_grb (in_1)    3.964    0.043   91.553    0.000
-##     B_C_grb (in_2)    3.663    0.048   75.896    0.000
-##     D_A_grb (in_2)    3.663    0.048   75.896    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_grb (int_)    3.872    0.036  108.819    0.000    3.872    6.940
+##     A_A_grb (int_)    3.872    0.036  108.819    0.000    3.872    6.940
+##     A_C_grb (in_1)    3.966    0.033  119.765    0.000    3.966    7.788
+##     C_A_grb (in_1)    3.966    0.033  119.765    0.000    3.966    7.788
+##     B_C_grb (in_2)    3.696    0.036  102.392    0.000    3.696    7.016
+##     D_A_grb (in_2)    3.696    0.036  102.392    0.000    3.696    7.016
 ## 
 ## Variances:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_grb (v_sl)    0.333    0.040    8.246    0.000
-##     A_A_grb (v_sl)    0.333    0.040    8.246    0.000
-##     A_C_grb (v_p1)    0.264    0.031    8.399    0.000
-##     C_A_grb (v_p1)    0.264    0.031    8.399    0.000
-##     B_C_grb (v_p2)    0.274    0.036    7.504    0.000
-##     D_A_grb (v_p2)    0.274    0.036    7.504    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_grb (v_sl)    0.311    0.029   10.769    0.000    0.311    1.000
+##     A_A_grb (v_sl)    0.311    0.029   10.769    0.000    0.311    1.000
+##     A_C_grb (v_p1)    0.259    0.024   10.958    0.000    0.259    1.000
+##     C_A_grb (v_p1)    0.259    0.024   10.958    0.000    0.259    1.000
+##     B_C_grb (v_p2)    0.277    0.029    9.630    0.000    0.277    1.000
+##     D_A_grb (v_p2)    0.277    0.029    9.630    0.000    0.277    1.000
 ## 
 ## Defined Parameters:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     p1_p2_rel_el      0.302    0.057    5.250    0.000
-##     self_p2_rel_el    0.181    0.064    2.826    0.005
-##     self_p1_rel_el   -0.120    0.052   -2.302    0.021</code></pre>
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     p1_p2_rel_el      0.270    0.043    6.339    0.000    0.270    0.771
+##     self_p2_rel_el    0.176    0.048    3.657    0.000    0.176   -0.076
+##     self_p1_rel_el   -0.094    0.039   -2.404    0.016   -0.094   -0.848</code></pre>
 <div id="conscientiousness" class="section level3">
 <h3>Conscientiousness</h3>
 <pre class="r"><code>consc_model &lt;- rep_analyses_auto(study1, 
@@ -2968,8 +4111,8 @@ summary(agree_model)</code></pre>
                   target_self = c(&quot;C_C_conscientiousness&quot;, &quot;A_A_conscientiousness&quot;))
 consc_elevation &lt;- ez_elevation_table(consc_model)
 consc_differential &lt;- ez_differential_table(consc_model)
-summary(consc_model)</code></pre>
-<pre><code>## lavaan 0.6-4 ended normally after 45 iterations
+summary(consc_model, standardized = TRUE)</code></pre>
+<pre><code>## lavaan 0.6-4 ended normally after 47 iterations
 ## 
 ##   Optimization method                           NLMINB
 ##   Number of free parameters                         24
@@ -2977,13 +4120,13 @@ summary(consc_model)</code></pre>
 ##   Row rank of the constraints matrix                 9
 ## 
 ##                                                   Used       Total
-##   Number of observations                            72          73
+##   Number of observations                           122         124
 ##   Number of missing patterns                         7
 ## 
 ##   Estimator                                         ML
-##   Model Fit Test Statistic                      12.274
+##   Model Fit Test Statistic                      22.549
 ##   Degrees of freedom                                12
-##   P-value (Chi-square)                           0.424
+##   P-value (Chi-square)                           0.032
 ## 
 ## Parameter Estimates:
 ## 
@@ -2992,54 +4135,78 @@ summary(consc_model)</code></pre>
 ##   Standard Errors                             Standard
 ## 
 ## Covariances:
-##                            Estimate  Std.Err  z-value  P(&gt;|z|)
-##   A_C_conscientiousness ~~                                    
-##     B_C_cns   (hc)            0.114    0.033    3.482    0.000
-##   C_A_conscientiousness ~~                                    
-##     D_A_cns   (hc)            0.114    0.033    3.482    0.000
-##   C_C_conscientiousness ~~                                    
-##     B_C_cns   (ha)            0.046    0.039    1.179    0.238
-##   A_A_conscientiousness ~~                                    
-##     D_A_cns   (ha)            0.046    0.039    1.179    0.238
-##   A_C_conscientiousness ~~                                    
-##     C_C_cns   (da)            0.063    0.030    2.084    0.037
-##   C_A_conscientiousness ~~                                    
-##     A_A_cns   (da)            0.063    0.030    2.084    0.037
-##   A_C_conscientiousness ~~                                    
-##     D_A_cns    (m)           -0.097    0.041   -2.381    0.017
-##     C_A_cns  (rec)           -0.012    0.032   -0.368    0.713
-##   B_C_conscientiousness ~~                                    
-##     D_A_cns    (h)           -0.043    0.052   -0.828    0.408
-##   C_C_conscientiousness ~~                                    
-##     A_A_cns (tr_s)           -0.049    0.050   -0.973    0.330
-##   A_A_conscientiousness ~~                                    
-##     B_C_cns (a__3)            0.003    0.050    0.055    0.956
-##   A_C_conscientiousness ~~                                    
-##     A_A_cns (a__1)            0.077    0.041    1.867    0.062
+##                            Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv
+##   A_C_conscientiousness ~~                                             
+##     B_C_cns   (hc)            0.124    0.025    4.880    0.000    0.124
+##   C_A_conscientiousness ~~                                             
+##     D_A_cns   (hc)            0.124    0.025    4.880    0.000    0.124
+##   C_C_conscientiousness ~~                                             
+##     B_C_cns   (ha)            0.048    0.030    1.628    0.104    0.048
+##   A_A_conscientiousness ~~                                             
+##     D_A_cns   (ha)            0.048    0.030    1.628    0.104    0.048
+##   A_C_conscientiousness ~~                                             
+##     C_C_cns   (da)            0.060    0.023    2.628    0.009    0.060
+##   C_A_conscientiousness ~~                                             
+##     A_A_cns   (da)            0.060    0.023    2.628    0.009    0.060
+##   A_C_conscientiousness ~~                                             
+##     D_A_cns    (m)           -0.090    0.031   -2.876    0.004   -0.090
+##     C_A_cns  (rec)            0.003    0.024    0.105    0.916    0.003
+##   B_C_conscientiousness ~~                                             
+##     D_A_cns    (h)           -0.030    0.042   -0.715    0.474   -0.030
+##   C_C_conscientiousness ~~                                             
+##     A_A_cns (tr_s)           -0.044    0.037   -1.203    0.229   -0.044
+##   A_A_conscientiousness ~~                                             
+##     B_C_cns (a__3)            0.024    0.038    0.643    0.520    0.024
+##   A_C_conscientiousness ~~                                             
+##     A_A_cns (a__1)            0.073    0.030    2.455    0.014    0.073
+##   Std.all
+##          
+##     0.369
+##          
+##     0.369
+##          
+##     0.122
+##          
+##     0.122
+##          
+##     0.171
+##          
+##     0.171
+##          
+##    -0.270
+##     0.009
+##          
+##    -0.079
+##          
+##    -0.108
+##          
+##     0.062
+##          
+##     0.211
 ## 
 ## Intercepts:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_cns (int_)    3.486    0.051   67.813    0.000
-##     A_A_cns (int_)    3.486    0.051   67.813    0.000
-##     A_C_cns (in_1)    3.689    0.044   83.041    0.000
-##     C_A_cns (in_1)    3.689    0.044   83.041    0.000
-##     B_C_cns (in_2)    3.545    0.054   65.853    0.000
-##     D_A_cns (in_2)    3.545    0.054   65.853    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_cns (int_)    3.521    0.039   90.690    0.000    3.521    5.508
+##     A_A_cns (int_)    3.521    0.039   90.690    0.000    3.521    5.508
+##     A_C_cns (in_1)    3.695    0.035  106.449    0.000    3.695    6.787
+##     C_A_cns (in_1)    3.695    0.035  106.449    0.000    3.695    6.787
+##     B_C_cns (in_2)    3.567    0.043   83.374    0.000    3.567    5.795
+##     D_A_cns (in_2)    3.567    0.043   83.374    0.000    3.567    5.795
 ## 
 ## Variances:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_cns (v_sl)    0.424    0.051    8.323    0.000
-##     A_A_cns (v_sl)    0.424    0.051    8.323    0.000
-##     A_C_cns (v_p1)    0.300    0.036    8.406    0.000
-##     C_A_cns (v_p1)    0.300    0.036    8.406    0.000
-##     B_C_cns (v_p2)    0.370    0.049    7.579    0.000
-##     D_A_cns (v_p2)    0.370    0.049    7.579    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_cns (v_sl)    0.409    0.038   10.865    0.000    0.409    1.000
+##     A_A_cns (v_sl)    0.409    0.038   10.865    0.000    0.409    1.000
+##     A_C_cns (v_p1)    0.296    0.027   11.049    0.000    0.296    1.000
+##     C_A_cns (v_p1)    0.296    0.027   11.049    0.000    0.296    1.000
+##     B_C_cns (v_p2)    0.379    0.039    9.840    0.000    0.379    1.000
+##     D_A_cns (v_p2)    0.379    0.039    9.840    0.000    0.379    1.000
 ## 
 ## Defined Parameters:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     p1_p2_rel_el      0.144    0.062    2.324    0.020
-##     self_p2_rel_el   -0.059    0.070   -0.845    0.398
-##     self_p1_rel_el   -0.203    0.057   -3.594    0.000</code></pre>
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     p1_p2_rel_el      0.128    0.048    2.656    0.008    0.128    0.992
+##     self_p2_rel_el   -0.046    0.053   -0.858    0.391   -0.046   -0.287
+##     self_p1_rel_el   -0.174    0.044   -3.962    0.000   -0.174   -1.279</code></pre>
 </div>
 <div id="honesty-propriety" class="section level3">
 <h3>Honesty-Propriety</h3>
@@ -3049,8 +4216,8 @@ summary(consc_model)</code></pre>
                   target_self = c(&quot;C_C_hp&quot;, &quot;A_A_hp&quot;))
 hp_elevation &lt;- ez_elevation_table(hp_model)
 hp_differential &lt;- ez_differential_table(hp_model)
-summary(hp_model)</code></pre>
-<pre><code>## lavaan 0.6-4 ended normally after 47 iterations
+summary(hp_model, standardized = TRUE)</code></pre>
+<pre><code>## lavaan 0.6-4 ended normally after 52 iterations
 ## 
 ##   Optimization method                           NLMINB
 ##   Number of free parameters                         24
@@ -3058,13 +4225,13 @@ summary(hp_model)</code></pre>
 ##   Row rank of the constraints matrix                 9
 ## 
 ##                                                   Used       Total
-##   Number of observations                            72          73
+##   Number of observations                           122         124
 ##   Number of missing patterns                         7
 ## 
 ##   Estimator                                         ML
-##   Model Fit Test Statistic                       8.003
+##   Model Fit Test Statistic                      18.273
 ##   Degrees of freedom                                12
-##   P-value (Chi-square)                           0.785
+##   P-value (Chi-square)                           0.108
 ## 
 ## Parameter Estimates:
 ## 
@@ -3073,54 +4240,54 @@ summary(hp_model)</code></pre>
 ##   Standard Errors                             Standard
 ## 
 ## Covariances:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##   A_C_hp ~~                                           
-##     B_C_hp    (hc)    0.086    0.026    3.319    0.001
-##   C_A_hp ~~                                           
-##     D_A_hp    (hc)    0.086    0.026    3.319    0.001
-##   C_C_hp ~~                                           
-##     B_C_hp    (ha)    0.029    0.033    0.899    0.369
-##   A_A_hp ~~                                           
-##     D_A_hp    (ha)    0.029    0.033    0.899    0.369
-##   A_C_hp ~~                                           
-##     C_C_hp    (da)    0.043    0.025    1.721    0.085
-##   C_A_hp ~~                                           
-##     A_A_hp    (da)    0.043    0.025    1.721    0.085
-##   A_C_hp ~~                                           
-##     D_A_hp     (m)   -0.038    0.041   -0.933    0.351
-##     C_A_hp   (rec)   -0.036    0.028   -1.289    0.197
-##   B_C_hp ~~                                           
-##     D_A_hp     (h)    0.012    0.053    0.219    0.827
-##   C_C_hp ~~                                           
-##     A_A_hp  (tr_s)   -0.041    0.040   -1.020    0.308
-##   A_A_hp ~~                                           
-##     B_C_hp  (a__3)    0.037    0.037    1.019    0.308
-##   A_C_hp ~~                                           
-##     A_A_hp  (a__1)    0.029    0.036    0.789    0.430
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##   A_C_hp ~~                                                             
+##     B_C_hp    (hc)    0.090    0.021    4.396    0.000    0.090    0.329
+##   C_A_hp ~~                                                             
+##     D_A_hp    (hc)    0.090    0.021    4.396    0.000    0.090    0.329
+##   C_C_hp ~~                                                             
+##     B_C_hp    (ha)    0.018    0.025    0.720    0.471    0.018    0.057
+##   A_A_hp ~~                                                             
+##     D_A_hp    (ha)    0.018    0.025    0.720    0.471    0.018    0.057
+##   A_C_hp ~~                                                             
+##     C_C_hp    (da)    0.033    0.019    1.692    0.091    0.033    0.115
+##   C_A_hp ~~                                                             
+##     A_A_hp    (da)    0.033    0.019    1.692    0.091    0.033    0.115
+##   A_C_hp ~~                                                             
+##     D_A_hp     (m)   -0.061    0.033   -1.849    0.065   -0.061   -0.223
+##     C_A_hp   (rec)   -0.027    0.022   -1.248    0.212   -0.027   -0.108
+##   B_C_hp ~~                                                             
+##     D_A_hp     (h)   -0.026    0.045   -0.592    0.554   -0.026   -0.088
+##   C_C_hp ~~                                                             
+##     A_A_hp  (tr_s)   -0.038    0.030   -1.285    0.199   -0.038   -0.118
+##   A_A_hp ~~                                                             
+##     B_C_hp  (a__3)    0.023    0.028    0.820    0.412    0.023    0.074
+##   A_C_hp ~~                                                             
+##     A_A_hp  (a__1)    0.028    0.027    1.039    0.299    0.028    0.099
 ## 
 ## Intercepts:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_hp  (int_)    3.703    0.046   80.736    0.000
-##     A_A_hp  (int_)    3.703    0.046   80.736    0.000
-##     A_C_hp  (in_1)    3.805    0.038   99.871    0.000
-##     C_A_hp  (in_1)    3.805    0.038   99.871    0.000
-##     B_C_hp  (in_2)    3.415    0.052   66.265    0.000
-##     D_A_hp  (in_2)    3.415    0.052   66.265    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_hp  (int_)    3.726    0.035  107.849    0.000    3.726    6.541
+##     A_A_hp  (int_)    3.726    0.035  107.849    0.000    3.726    6.541
+##     A_C_hp  (in_1)    3.789    0.030  125.661    0.000    3.789    7.580
+##     C_A_hp  (in_1)    3.789    0.030  125.661    0.000    3.789    7.580
+##     B_C_hp  (in_2)    3.424    0.039   87.618    0.000    3.424    6.238
+##     D_A_hp  (in_2)    3.424    0.039   87.618    0.000    3.424    6.238
 ## 
 ## Variances:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_hp  (v_sl)    0.337    0.041    8.267    0.000
-##     A_A_hp  (v_sl)    0.337    0.041    8.267    0.000
-##     A_C_hp  (v_p1)    0.244    0.029    8.399    0.000
-##     C_A_hp  (v_p1)    0.244    0.029    8.399    0.000
-##     B_C_hp  (v_p2)    0.289    0.039    7.444    0.000
-##     D_A_hp  (v_p2)    0.289    0.039    7.444    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_hp  (v_sl)    0.325    0.030   10.805    0.000    0.325    1.000
+##     A_A_hp  (v_sl)    0.325    0.030   10.805    0.000    0.325    1.000
+##     A_C_hp  (v_p1)    0.250    0.023   11.032    0.000    0.250    1.000
+##     C_A_hp  (v_p1)    0.250    0.023   11.032    0.000    0.250    1.000
+##     B_C_hp  (v_p2)    0.301    0.031    9.776    0.000    0.301    1.000
+##     D_A_hp  (v_p2)    0.301    0.031    9.776    0.000    0.301    1.000
 ## 
 ## Defined Parameters:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     p1_p2_rel_el      0.390    0.056    6.978    0.000
-##     self_p2_rel_el    0.288    0.064    4.531    0.000
-##     self_p1_rel_el   -0.102    0.053   -1.946    0.052</code></pre>
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     p1_p2_rel_el      0.365    0.043    8.399    0.000    0.365    1.342
+##     self_p2_rel_el    0.302    0.050    6.095    0.000    0.302    0.303
+##     self_p1_rel_el   -0.063    0.041   -1.513    0.130   -0.063   -1.038</code></pre>
 </div>
 <div id="neuroticism" class="section level3">
 <h3>Neuroticism</h3>
@@ -3130,8 +4297,8 @@ summary(hp_model)</code></pre>
                   target_self = c(&quot;C_C_neuroticism&quot;, &quot;A_A_neuroticism&quot;))
 neuro_elevation &lt;- ez_elevation_table(neuro_model)
 neuro_differential &lt;- ez_differential_table(neuro_model)
-summary(neuro_model)</code></pre>
-<pre><code>## lavaan 0.6-4 ended normally after 35 iterations
+summary(neuro_model, standardized = TRUE)</code></pre>
+<pre><code>## lavaan 0.6-4 ended normally after 36 iterations
 ## 
 ##   Optimization method                           NLMINB
 ##   Number of free parameters                         24
@@ -3139,13 +4306,13 @@ summary(neuro_model)</code></pre>
 ##   Row rank of the constraints matrix                 9
 ## 
 ##                                                   Used       Total
-##   Number of observations                            72          73
+##   Number of observations                           122         124
 ##   Number of missing patterns                         7
 ## 
 ##   Estimator                                         ML
-##   Model Fit Test Statistic                      13.259
+##   Model Fit Test Statistic                      25.257
 ##   Degrees of freedom                                12
-##   P-value (Chi-square)                           0.351
+##   P-value (Chi-square)                           0.014
 ## 
 ## Parameter Estimates:
 ## 
@@ -3154,54 +4321,54 @@ summary(neuro_model)</code></pre>
 ##   Standard Errors                             Standard
 ## 
 ## Covariances:
-##                      Estimate  Std.Err  z-value  P(&gt;|z|)
-##   A_C_neuroticism ~~                                    
-##     B_C_nrt   (hc)      0.099    0.028    3.553    0.000
-##   C_A_neuroticism ~~                                    
-##     D_A_nrt   (hc)      0.099    0.028    3.553    0.000
-##   C_C_neuroticism ~~                                    
-##     B_C_nrt   (ha)      0.073    0.048    1.516    0.130
-##   A_A_neuroticism ~~                                    
-##     D_A_nrt   (ha)      0.073    0.048    1.516    0.130
-##   A_C_neuroticism ~~                                    
-##     C_C_nrt   (da)      0.072    0.036    1.974    0.048
-##   C_A_neuroticism ~~                                    
-##     A_A_nrt   (da)      0.072    0.036    1.974    0.048
-##   A_C_neuroticism ~~                                    
-##     D_A_nrt    (m)      0.084    0.050    1.701    0.089
-##     C_A_nrt  (rec)     -0.003    0.027   -0.109    0.914
-##   B_C_neuroticism ~~                                    
-##     D_A_nrt    (h)     -0.037    0.065   -0.570    0.569
-##   C_C_neuroticism ~~                                    
-##     A_A_nrt (tr_s)      0.029    0.084    0.344    0.731
-##   A_A_neuroticism ~~                                    
-##     B_C_nrt (a__3)      0.038    0.059    0.649    0.516
-##   A_C_neuroticism ~~                                    
-##     A_A_nrt (a__1)      0.057    0.051    1.117    0.264
+##                      Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##   A_C_neuroticism ~~                                                      
+##     B_C_nrt   (hc)      0.109    0.022    4.910    0.000    0.109    0.357
+##   C_A_neuroticism ~~                                                      
+##     D_A_nrt   (hc)      0.109    0.022    4.910    0.000    0.109    0.357
+##   C_C_neuroticism ~~                                                      
+##     B_C_nrt   (ha)      0.067    0.037    1.789    0.074    0.067    0.129
+##   A_A_neuroticism ~~                                                      
+##     D_A_nrt   (ha)      0.067    0.037    1.789    0.074    0.067    0.129
+##   A_C_neuroticism ~~                                                      
+##     C_C_nrt   (da)      0.077    0.028    2.781    0.005    0.077    0.186
+##   C_A_neuroticism ~~                                                      
+##     A_A_nrt   (da)      0.077    0.028    2.781    0.005    0.077    0.186
+##   A_C_neuroticism ~~                                                      
+##     D_A_nrt    (m)      0.086    0.037    2.291    0.022    0.086    0.282
+##     C_A_nrt  (rec)     -0.013    0.021   -0.614    0.539   -0.013   -0.053
+##   B_C_neuroticism ~~                                                      
+##     D_A_nrt    (h)     -0.060    0.051   -1.171    0.241   -0.060   -0.158
+##   C_C_neuroticism ~~                                                      
+##     A_A_nrt (tr_s)      0.058    0.063    0.918    0.359    0.058    0.082
+##   A_A_neuroticism ~~                                                      
+##     B_C_nrt (a__3)      0.047    0.047    0.995    0.320    0.047    0.091
+##   A_C_neuroticism ~~                                                      
+##     A_A_nrt (a__1)      0.060    0.039    1.521    0.128    0.060    0.144
 ## 
 ## Intercepts:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_nrt (int_)    2.923    0.073   40.114    0.000
-##     A_A_nrt (int_)    2.923    0.073   40.114    0.000
-##     A_C_nrt (in_1)    2.547    0.040   62.887    0.000
-##     C_A_nrt (in_1)    2.547    0.040   62.887    0.000
-##     B_C_nrt (in_2)    2.763    0.052   52.918    0.000
-##     D_A_nrt (in_2)    2.763    0.052   52.918    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_nrt (int_)    2.879    0.057   50.937    0.000    2.879    3.413
+##     A_A_nrt (int_)    2.879    0.057   50.937    0.000    2.879    3.413
+##     A_C_nrt (in_1)    2.536    0.031   82.774    0.000    2.536    5.130
+##     C_A_nrt (in_1)    2.536    0.031   82.774    0.000    2.536    5.130
+##     B_C_nrt (in_2)    2.739    0.040   68.223    0.000    2.739    4.456
+##     D_A_nrt (in_2)    2.739    0.040   68.223    0.000    2.739    4.456
 ## 
 ## Variances:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_nrt (v_sl)    0.722    0.086    8.403    0.000
-##     A_A_nrt (v_sl)    0.722    0.086    8.403    0.000
-##     A_C_nrt (v_p1)    0.240    0.029    8.392    0.000
-##     C_A_nrt (v_p1)    0.240    0.029    8.392    0.000
-##     B_C_nrt (v_p2)    0.357    0.049    7.349    0.000
-##     D_A_nrt (v_p2)    0.357    0.049    7.349    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_nrt (v_sl)    0.712    0.065   10.967    0.000    0.712    1.000
+##     A_A_nrt (v_sl)    0.712    0.065   10.967    0.000    0.712    1.000
+##     A_C_nrt (v_p1)    0.244    0.022   10.890    0.000    0.244    1.000
+##     C_A_nrt (v_p1)    0.244    0.022   10.890    0.000    0.244    1.000
+##     B_C_nrt (v_p2)    0.378    0.040    9.444    0.000    0.378    1.000
+##     D_A_nrt (v_p2)    0.378    0.040    9.444    0.000    0.378    1.000
 ## 
 ## Defined Parameters:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     p1_p2_rel_el     -0.216    0.050   -4.316    0.000
-##     self_p2_rel_el    0.160    0.082    1.939    0.052
-##     self_p1_rel_el    0.376    0.074    5.056    0.000</code></pre>
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     p1_p2_rel_el     -0.204    0.037   -5.487    0.000   -0.204    0.674
+##     self_p2_rel_el    0.140    0.064    2.191    0.028    0.140   -1.043
+##     self_p1_rel_el    0.344    0.057    6.038    0.000    0.344   -1.716</code></pre>
 </div>
 <div id="extraversion" class="section level3">
 <h3>Extraversion</h3>
@@ -3211,8 +4378,8 @@ summary(neuro_model)</code></pre>
                   target_self = c(&quot;C_C_extraversion&quot;, &quot;A_A_extraversion&quot;))
 extra_elevation &lt;- ez_elevation_table(extra_model)
 extra_differential &lt;- ez_differential_table(extra_model)
-summary(extra_model)</code></pre>
-<pre><code>## lavaan 0.6-4 ended normally after 34 iterations
+summary(extra_model, standardized = TRUE)</code></pre>
+<pre><code>## lavaan 0.6-4 ended normally after 38 iterations
 ## 
 ##   Optimization method                           NLMINB
 ##   Number of free parameters                         24
@@ -3220,13 +4387,13 @@ summary(extra_model)</code></pre>
 ##   Row rank of the constraints matrix                 9
 ## 
 ##                                                   Used       Total
-##   Number of observations                            72          73
+##   Number of observations                           122         124
 ##   Number of missing patterns                         7
 ## 
 ##   Estimator                                         ML
-##   Model Fit Test Statistic                      11.606
+##   Model Fit Test Statistic                      24.616
 ##   Degrees of freedom                                12
-##   P-value (Chi-square)                           0.478
+##   P-value (Chi-square)                           0.017
 ## 
 ## Parameter Estimates:
 ## 
@@ -3235,54 +4402,78 @@ summary(extra_model)</code></pre>
 ##   Standard Errors                             Standard
 ## 
 ## Covariances:
-##                       Estimate  Std.Err  z-value  P(&gt;|z|)
-##   A_C_extraversion ~~                                    
-##     B_C_xtr   (hc)       0.305    0.056    5.486    0.000
-##   C_A_extraversion ~~                                    
-##     D_A_xtr   (hc)       0.305    0.056    5.486    0.000
-##   C_C_extraversion ~~                                    
-##     B_C_xtr   (ha)       0.151    0.050    3.016    0.003
-##   A_A_extraversion ~~                                    
-##     D_A_xtr   (ha)       0.151    0.050    3.016    0.003
-##   A_C_extraversion ~~                                    
-##     C_C_xtr   (da)       0.220    0.048    4.554    0.000
-##   C_A_extraversion ~~                                    
-##     A_A_xtr   (da)       0.220    0.048    4.554    0.000
-##   A_C_extraversion ~~                                    
-##     D_A_xtr    (m)       0.046    0.078    0.592    0.554
-##     C_A_xtr  (rec)      -0.060    0.056   -1.077    0.282
-##   B_C_extraversion ~~                                    
-##     D_A_xtr    (h)       0.059    0.062    0.945    0.344
-##   C_C_extraversion ~~                                    
-##     A_A_xtr (tr_s)      -0.054    0.058   -0.923    0.356
-##   A_A_extraversion ~~                                    
-##     B_C_xtr (a__3)      -0.039    0.055   -0.709    0.478
-##   A_C_extraversion ~~                                    
-##     A_A_xtr (a__1)      -0.044    0.066   -0.669    0.504
+##                       Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv
+##   A_C_extraversion ~~                                             
+##     B_C_xtr   (hc)       0.305    0.042    7.270    0.000    0.305
+##   C_A_extraversion ~~                                             
+##     D_A_xtr   (hc)       0.305    0.042    7.270    0.000    0.305
+##   C_C_extraversion ~~                                             
+##     B_C_xtr   (ha)       0.141    0.039    3.627    0.000    0.141
+##   A_A_extraversion ~~                                             
+##     D_A_xtr   (ha)       0.141    0.039    3.627    0.000    0.141
+##   A_C_extraversion ~~                                             
+##     C_C_xtr   (da)       0.219    0.037    5.953    0.000    0.219
+##   C_A_extraversion ~~                                             
+##     A_A_xtr   (da)       0.219    0.037    5.953    0.000    0.219
+##   A_C_extraversion ~~                                             
+##     D_A_xtr    (m)       0.027    0.057    0.467    0.640    0.027
+##     C_A_xtr  (rec)      -0.071    0.042   -1.681    0.093   -0.071
+##   B_C_extraversion ~~                                             
+##     D_A_xtr    (h)       0.078    0.047    1.680    0.093    0.078
+##   C_C_extraversion ~~                                             
+##     A_A_xtr (tr_s)      -0.068    0.045   -1.497    0.134   -0.068
+##   A_A_extraversion ~~                                             
+##     B_C_xtr (a__3)      -0.006    0.043   -0.138    0.890   -0.006
+##   A_C_extraversion ~~                                             
+##     A_A_xtr (a__1)      -0.050    0.051   -0.969    0.333   -0.050
+##   Std.all
+##          
+##     0.580
+##          
+##     0.580
+##          
+##     0.260
+##          
+##     0.260
+##          
+##     0.418
+##          
+##     0.418
+##          
+##     0.051
+##    -0.141
+##          
+##     0.144
+##          
+##    -0.126
+##          
+##    -0.011
+##          
+##    -0.095
 ## 
 ## Intercepts:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_xtr (int_)    3.426    0.058   59.208    0.000
-##     A_A_xtr (int_)    3.426    0.058   59.208    0.000
-##     A_C_xtr (in_1)    3.191    0.057   56.151    0.000
-##     C_A_xtr (in_1)    3.191    0.057   56.151    0.000
-##     B_C_xtr (in_2)    3.228    0.070   46.229    0.000
-##     D_A_xtr (in_2)    3.228    0.070   46.229    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_xtr (int_)    3.411    0.044   76.887    0.000    3.411    4.642
+##     A_A_xtr (int_)    3.411    0.044   76.887    0.000    3.411    4.642
+##     A_C_xtr (in_1)    3.213    0.042   75.985    0.000    3.213    4.516
+##     C_A_xtr (in_1)    3.213    0.042   75.985    0.000    3.213    4.516
+##     B_C_xtr (in_2)    3.252    0.055   59.581    0.000    3.252    4.400
+##     D_A_xtr (in_2)    3.252    0.055   59.581    0.000    3.252    4.400
 ## 
 ## Variances:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_xtr (v_sl)    0.526    0.063    8.360    0.000
-##     A_A_xtr (v_sl)    0.526    0.063    8.360    0.000
-##     A_C_xtr (v_p1)    0.523    0.062    8.362    0.000
-##     C_A_xtr (v_p1)    0.523    0.062    8.362    0.000
-##     B_C_xtr (v_p2)    0.545    0.072    7.526    0.000
-##     D_A_xtr (v_p2)    0.545    0.072    7.526    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_xtr (v_sl)    0.540    0.050   10.850    0.000    0.540    1.000
+##     A_A_xtr (v_sl)    0.540    0.050   10.850    0.000    0.540    1.000
+##     A_C_xtr (v_p1)    0.506    0.047   10.854    0.000    0.506    1.000
+##     C_A_xtr (v_p1)    0.506    0.047   10.854    0.000    0.506    1.000
+##     B_C_xtr (v_p2)    0.546    0.056    9.786    0.000    0.546    1.000
+##     D_A_xtr (v_p2)    0.546    0.056    9.786    0.000    0.546    1.000
 ## 
 ## Defined Parameters:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     p1_p2_rel_el     -0.037    0.060   -0.617    0.537
-##     self_p2_rel_el    0.198    0.080    2.464    0.014
-##     self_p1_rel_el    0.235    0.062    3.794    0.000</code></pre>
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     p1_p2_rel_el     -0.038    0.047   -0.821    0.411   -0.038    0.117
+##     self_p2_rel_el    0.159    0.062    2.590    0.010    0.159    0.242
+##     self_p1_rel_el    0.198    0.047    4.251    0.000    0.198    0.126</code></pre>
 </div>
 <div id="openness" class="section level3">
 <h3>Openness</h3>
@@ -3292,8 +4483,8 @@ summary(extra_model)</code></pre>
                   target_self = c(&quot;C_C_openness&quot;, &quot;A_A_openness&quot;))
 open_elevation &lt;- ez_elevation_table(open_model)
 open_differential &lt;- ez_differential_table(open_model)
-summary(open_model)</code></pre>
-<pre><code>## lavaan 0.6-4 ended normally after 49 iterations
+summary(open_model, standardized = TRUE)</code></pre>
+<pre><code>## lavaan 0.6-4 ended normally after 53 iterations
 ## 
 ##   Optimization method                           NLMINB
 ##   Number of free parameters                         24
@@ -3301,13 +4492,13 @@ summary(open_model)</code></pre>
 ##   Row rank of the constraints matrix                 9
 ## 
 ##                                                   Used       Total
-##   Number of observations                            72          73
+##   Number of observations                           122         124
 ##   Number of missing patterns                         7
 ## 
 ##   Estimator                                         ML
-##   Model Fit Test Statistic                      23.437
+##   Model Fit Test Statistic                      46.337
 ##   Degrees of freedom                                12
-##   P-value (Chi-square)                           0.024
+##   P-value (Chi-square)                           0.000
 ## 
 ## Parameter Estimates:
 ## 
@@ -3316,54 +4507,54 @@ summary(open_model)</code></pre>
 ##   Standard Errors                             Standard
 ## 
 ## Covariances:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##   A_C_openness ~~                                     
-##     B_C_pnn   (hc)    0.051    0.022    2.374    0.018
-##   C_A_openness ~~                                     
-##     D_A_pnn   (hc)    0.051    0.022    2.374    0.018
-##   C_C_openness ~~                                     
-##     B_C_pnn   (ha)    0.046    0.028    1.666    0.096
-##   A_A_openness ~~                                     
-##     D_A_pnn   (ha)    0.046    0.028    1.666    0.096
-##   A_C_openness ~~                                     
-##     C_C_pnn   (da)    0.083    0.025    3.310    0.001
-##   C_A_openness ~~                                     
-##     A_A_pnn   (da)    0.083    0.025    3.310    0.001
-##   A_C_openness ~~                                     
-##     D_A_pnn    (m)   -0.009    0.043   -0.210    0.834
-##     C_A_pnn  (rec)    0.000    0.024    0.005    0.996
-##   B_C_openness ~~                                     
-##     D_A_pnn    (h)   -0.039    0.051   -0.773    0.440
-##   C_C_openness ~~                                     
-##     A_A_pnn (tr_s)   -0.055    0.043   -1.300    0.194
-##   A_A_openness ~~                                     
-##     B_C_pnn (a__3)   -0.015    0.029   -0.508    0.611
-##   A_C_openness ~~                                     
-##     A_A_pnn (a__1)    0.032    0.031    1.030    0.303
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##   A_C_openness ~~                                                       
+##     B_C_pnn   (hc)    0.055    0.017    3.340    0.001    0.055    0.245
+##   C_A_openness ~~                                                       
+##     D_A_pnn   (hc)    0.055    0.017    3.340    0.001    0.055    0.245
+##   C_C_openness ~~                                                       
+##     B_C_pnn   (ha)    0.036    0.021    1.698    0.090    0.036    0.128
+##   A_A_openness ~~                                                       
+##     D_A_pnn   (ha)    0.036    0.021    1.698    0.090    0.036    0.128
+##   A_C_openness ~~                                                       
+##     C_C_pnn   (da)    0.078    0.019    4.095    0.000    0.078    0.284
+##   C_A_openness ~~                                                       
+##     A_A_pnn   (da)    0.078    0.019    4.095    0.000    0.078    0.284
+##   A_C_openness ~~                                                       
+##     D_A_pnn    (m)   -0.025    0.031   -0.809    0.419   -0.025   -0.113
+##     C_A_pnn  (rec)   -0.001    0.018   -0.035    0.972   -0.001   -0.003
+##   B_C_openness ~~                                                       
+##     D_A_pnn    (h)   -0.034    0.044   -0.781    0.435   -0.034   -0.148
+##   C_C_openness ~~                                                       
+##     A_A_pnn (tr_s)   -0.047    0.032   -1.483    0.138   -0.047   -0.137
+##   A_A_openness ~~                                                       
+##     B_C_pnn (a__3)   -0.011    0.022   -0.483    0.629   -0.011   -0.038
+##   A_C_openness ~~                                                       
+##     A_A_pnn (a__1)    0.039    0.023    1.682    0.092    0.039    0.142
 ## 
 ## Intercepts:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_pnn (int_)    3.807    0.046   83.188    0.000
-##     A_A_pnn (int_)    3.807    0.046   83.188    0.000
-##     A_C_pnn (in_1)    3.463    0.039   88.299    0.000
-##     C_A_pnn (in_1)    3.463    0.039   88.299    0.000
-##     B_C_pnn (in_2)    3.312    0.042   79.074    0.000
-##     D_A_pnn (in_2)    3.312    0.042   79.074    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_pnn (int_)    3.810    0.035  107.765    0.000    3.810    6.472
+##     A_A_pnn (int_)    3.810    0.035  107.765    0.000    3.810    6.472
+##     A_C_pnn (in_1)    3.458    0.030  115.090    0.000    3.458    7.401
+##     C_A_pnn (in_1)    3.458    0.030  115.090    0.000    3.458    7.401
+##     B_C_pnn (in_2)    3.315    0.034   98.784    0.000    3.315    6.890
+##     D_A_pnn (in_2)    3.315    0.034   98.784    0.000    3.315    6.890
 ## 
 ## Variances:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     C_C_pnn (v_sl)    0.350    0.043    8.142    0.000
-##     A_A_pnn (v_sl)    0.350    0.043    8.142    0.000
-##     A_C_pnn (v_p1)    0.217    0.026    8.347    0.000
-##     C_A_pnn (v_p1)    0.217    0.026    8.347    0.000
-##     B_C_pnn (v_p2)    0.226    0.030    7.424    0.000
-##     D_A_pnn (v_p2)    0.226    0.030    7.424    0.000
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     C_C_pnn (v_sl)    0.347    0.032   10.694    0.000    0.347    1.000
+##     A_A_pnn (v_sl)    0.347    0.032   10.694    0.000    0.347    1.000
+##     A_C_pnn (v_p1)    0.218    0.020   10.877    0.000    0.218    1.000
+##     C_A_pnn (v_p1)    0.218    0.020   10.877    0.000    0.218    1.000
+##     B_C_pnn (v_p2)    0.231    0.024    9.665    0.000    0.231    1.000
+##     D_A_pnn (v_p2)    0.231    0.024    9.665    0.000    0.231    1.000
 ## 
 ## Defined Parameters:
-##                    Estimate  Std.Err  z-value  P(&gt;|z|)
-##     p1_p2_rel_el      0.151    0.051    2.936    0.003
-##     self_p2_rel_el    0.496    0.058    8.582    0.000
-##     self_p1_rel_el    0.345    0.047    7.281    0.000</code></pre>
+##                    Estimate  Std.Err  z-value  P(&gt;|z|)   Std.lv  Std.all
+##     p1_p2_rel_el      0.143    0.041    3.516    0.000    0.143    0.511
+##     self_p2_rel_el    0.495    0.046   10.716    0.000    0.495   -0.418
+##     self_p1_rel_el    0.352    0.037    9.595    0.000    0.352   -0.929</code></pre>
 </div>
 </div>
 <div id="relative-elevation" class="section level2">
@@ -3371,8 +4562,7 @@ summary(open_model)</code></pre>
 <div id="elevation-results" class="section level3">
 <h3>Elevation Results</h3>
 <p>And here is a table of the relative elevation results, similar to Table 1 in the manuscript.</p>
-<pre class="r"><code>library(kableExtra)
-mutate(agree_elevation$elevation_table,
+<pre class="r"><code>mutate(agree_elevation$elevation_table,
        domain = &quot;Agreeableness&quot;) %&gt;% 
   rbind(mutate(consc_elevation$elevation_table,
                domain = &quot;Conscientiousness&quot;)) %&gt;% 
@@ -3462,19 +4652,19 @@ P1-P2 Relative Elevation
 Agreeableness
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.30</span>
+<span style=" font-weight: bold;    color: blue !important;">0.27</span>
 </td>
 <td style="text-align:left;">
 <span style=" font-weight: bold;    color: blue !important;">0.19</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.41</span>
+<span style=" font-weight: bold;    color: blue !important;">0.35</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.58</span>
+<span style=" font-weight: bold;    color: blue !important;">0.52</span>
 </td>
 <td style="text-align:right;">
-5.25
+6.34
 </td>
 <td style="text-align:left;">
 &lt; .001
@@ -3488,22 +4678,22 @@ P1-P2 Relative Elevation
 Conscientiousness
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.14</span>
+<span style=" font-weight: bold;    color: blue !important;">0.13</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.02</span>
+<span style=" font-weight: bold;    color: blue !important;">0.03</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.27</span>
+<span style=" font-weight: bold;    color: blue !important;">0.22</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.25</span>
+<span style=" font-weight: bold;    color: blue !important;">0.22</span>
 </td>
 <td style="text-align:right;">
-2.32
+2.66
 </td>
 <td style="text-align:left;">
-.020
+.008
 </td>
 </tr>
 <tr>
@@ -3514,19 +4704,19 @@ P1-P2 Relative Elevation
 Honesty-Propriety
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.39</span>
+<span style=" font-weight: bold;    color: blue !important;">0.37</span>
 </td>
 <td style="text-align:left;">
 <span style=" font-weight: bold;    color: blue !important;">0.28</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.50</span>
+<span style=" font-weight: bold;    color: blue !important;">0.45</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.76</span>
+<span style=" font-weight: bold;    color: blue !important;">0.70</span>
 </td>
 <td style="text-align:right;">
-6.98
+8.40
 </td>
 <td style="text-align:left;">
 &lt; .001
@@ -3540,19 +4730,19 @@ P1-P2 Relative Elevation
 Neuroticism
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.22</span>
+<span style=" font-weight: bold;    color: red !important;">-0.20</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.31</span>
+<span style=" font-weight: bold;    color: red !important;">-0.28</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.12</span>
+<span style=" font-weight: bold;    color: red !important;">-0.13</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.40</span>
+<span style=" font-weight: bold;    color: red !important;">-0.37</span>
 </td>
 <td style="text-align:right;">
--4.32
+-5.49
 </td>
 <td style="text-align:left;">
 &lt; .001
@@ -3569,19 +4759,19 @@ Extraversion
 <span style="     color: red !important;">-0.04</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: red !important;">-0.16</span>
+<span style="     color: red !important;">-0.13</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: blue !important;">0.08</span>
+<span style="     color: blue !important;">0.05</span>
 </td>
 <td style="text-align:left;">
 <span style="     color: red !important;">-0.05</span>
 </td>
 <td style="text-align:right;">
--0.62
+-0.82
 </td>
 <td style="text-align:left;">
-.537
+.411
 </td>
 </tr>
 <tr>
@@ -3592,22 +4782,22 @@ P1-P2 Relative Elevation
 Openness
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.15</span>
+<span style=" font-weight: bold;    color: blue !important;">0.14</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.05</span>
+<span style=" font-weight: bold;    color: blue !important;">0.06</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.25</span>
+<span style=" font-weight: bold;    color: blue !important;">0.22</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.32</span>
+<span style=" font-weight: bold;    color: blue !important;">0.30</span>
 </td>
 <td style="text-align:right;">
-2.94
+3.52
 </td>
 <td style="text-align:left;">
-.003
+&lt; .001
 </td>
 </tr>
 <tr>
@@ -3621,19 +4811,19 @@ Agreeableness
 <span style=" font-weight: bold;    color: blue !important;">0.18</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.06</span>
+<span style=" font-weight: bold;    color: blue !important;">0.08</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.31</span>
+<span style=" font-weight: bold;    color: blue !important;">0.27</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.33</span>
+<span style=" font-weight: bold;    color: blue !important;">0.32</span>
 </td>
 <td style="text-align:right;">
-2.83
+3.66
 </td>
 <td style="text-align:left;">
-.005
+&lt; .001
 </td>
 </tr>
 <tr>
@@ -3644,22 +4834,22 @@ Self-P2 Relative Elevation
 Conscientiousness
 </td>
 <td style="text-align:left;">
-<span style="     color: red !important;">-0.06</span>
+<span style="     color: red !important;">-0.05</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: red !important;">-0.20</span>
+<span style="     color: red !important;">-0.15</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: blue !important;">0.08</span>
+<span style="     color: blue !important;">0.06</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: red !important;">-0.09</span>
+<span style="     color: red !important;">-0.07</span>
 </td>
 <td style="text-align:right;">
--0.84
+-0.86
 </td>
 <td style="text-align:left;">
-.398
+.391
 </td>
 </tr>
 <tr>
@@ -3670,19 +4860,19 @@ Self-P2 Relative Elevation
 Honesty-Propriety
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.29</span>
+<span style=" font-weight: bold;    color: blue !important;">0.30</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.16</span>
+<span style=" font-weight: bold;    color: blue !important;">0.21</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.41</span>
+<span style=" font-weight: bold;    color: blue !important;">0.40</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.51</span>
+<span style=" font-weight: bold;    color: blue !important;">0.54</span>
 </td>
 <td style="text-align:right;">
-4.53
+6.09
 </td>
 <td style="text-align:left;">
 &lt; .001
@@ -3696,22 +4886,22 @@ Self-P2 Relative Elevation
 Neuroticism
 </td>
 <td style="text-align:left;">
-<span style="     color: blue !important;">0.16</span>
+<span style=" font-weight: bold;    color: blue !important;">0.14</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: blue !important;">0.00</span>
+<span style=" font-weight: bold;    color: blue !important;">0.01</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: blue !important;">0.32</span>
+<span style=" font-weight: bold;    color: blue !important;">0.27</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: blue !important;">0.22</span>
+<span style=" font-weight: bold;    color: blue !important;">0.19</span>
 </td>
 <td style="text-align:right;">
-1.94
+2.19
 </td>
 <td style="text-align:left;">
-.052
+.028
 </td>
 </tr>
 <tr>
@@ -3722,22 +4912,22 @@ Self-P2 Relative Elevation
 Extraversion
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.20</span>
+<span style=" font-weight: bold;    color: blue !important;">0.16</span>
 </td>
 <td style="text-align:left;">
 <span style=" font-weight: bold;    color: blue !important;">0.04</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.35</span>
+<span style=" font-weight: bold;    color: blue !important;">0.28</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.27</span>
+<span style=" font-weight: bold;    color: blue !important;">0.22</span>
 </td>
 <td style="text-align:right;">
-2.46
+2.59
 </td>
 <td style="text-align:left;">
-.014
+.010
 </td>
 </tr>
 <tr>
@@ -3751,16 +4941,16 @@ Openness
 <span style=" font-weight: bold;    color: blue !important;">0.50</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.38</span>
+<span style=" font-weight: bold;    color: blue !important;">0.40</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.61</span>
+<span style=" font-weight: bold;    color: blue !important;">0.59</span>
 </td>
 <td style="text-align:left;">
 <span style=" font-weight: bold;    color: blue !important;">0.92</span>
 </td>
 <td style="text-align:right;">
-8.58
+10.72
 </td>
 <td style="text-align:left;">
 &lt; .001
@@ -3774,22 +4964,22 @@ Self-P1 Relative Elevation
 Agreeableness
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.12</span>
+<span style=" font-weight: bold;    color: red !important;">-0.09</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.22</span>
+<span style=" font-weight: bold;    color: red !important;">-0.17</span>
 </td>
 <td style="text-align:left;">
 <span style=" font-weight: bold;    color: red !important;">-0.02</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.22</span>
+<span style=" font-weight: bold;    color: red !important;">-0.18</span>
 </td>
 <td style="text-align:right;">
--2.30
+-2.40
 </td>
 <td style="text-align:left;">
-.021
+.016
 </td>
 </tr>
 <tr>
@@ -3800,19 +4990,19 @@ Self-P1 Relative Elevation
 Conscientiousness
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.20</span>
+<span style=" font-weight: bold;    color: red !important;">-0.17</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.31</span>
+<span style=" font-weight: bold;    color: red !important;">-0.26</span>
 </td>
 <td style="text-align:left;">
 <span style=" font-weight: bold;    color: red !important;">-0.09</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: red !important;">-0.34</span>
+<span style=" font-weight: bold;    color: red !important;">-0.29</span>
 </td>
 <td style="text-align:right;">
--3.59
+-3.96
 </td>
 <td style="text-align:left;">
 &lt; .001
@@ -3826,22 +5016,22 @@ Self-P1 Relative Elevation
 Honesty-Propriety
 </td>
 <td style="text-align:left;">
-<span style="     color: red !important;">-0.10</span>
+<span style="     color: red !important;">-0.06</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: red !important;">-0.21</span>
+<span style="     color: red !important;">-0.14</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: blue !important;">0.00</span>
+<span style="     color: blue !important;">0.02</span>
 </td>
 <td style="text-align:left;">
-<span style="     color: red !important;">-0.19</span>
+<span style="     color: red !important;">-0.12</span>
 </td>
 <td style="text-align:right;">
--1.95
+-1.51
 </td>
 <td style="text-align:left;">
-.052
+.130
 </td>
 </tr>
 <tr>
@@ -3852,19 +5042,19 @@ Self-P1 Relative Elevation
 Neuroticism
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.38</span>
+<span style=" font-weight: bold;    color: blue !important;">0.34</span>
 </td>
 <td style="text-align:left;">
 <span style=" font-weight: bold;    color: blue !important;">0.23</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.52</span>
+<span style=" font-weight: bold;    color: blue !important;">0.46</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.54</span>
+<span style=" font-weight: bold;    color: blue !important;">0.50</span>
 </td>
 <td style="text-align:right;">
-5.06
+6.04
 </td>
 <td style="text-align:left;">
 &lt; .001
@@ -3878,19 +5068,19 @@ Self-P1 Relative Elevation
 Extraversion
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.23</span>
+<span style=" font-weight: bold;    color: blue !important;">0.20</span>
 </td>
 <td style="text-align:left;">
 <span style=" font-weight: bold;    color: blue !important;">0.11</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.36</span>
+<span style=" font-weight: bold;    color: blue !important;">0.29</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.32</span>
+<span style=" font-weight: bold;    color: blue !important;">0.27</span>
 </td>
 <td style="text-align:right;">
-3.79
+4.25
 </td>
 <td style="text-align:left;">
 &lt; .001
@@ -3904,19 +5094,19 @@ Self-P1 Relative Elevation
 Openness
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.34</span>
+<span style=" font-weight: bold;    color: blue !important;">0.35</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.25</span>
+<span style=" font-weight: bold;    color: blue !important;">0.28</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.44</span>
+<span style=" font-weight: bold;    color: blue !important;">0.42</span>
 </td>
 <td style="text-align:left;">
-<span style=" font-weight: bold;    color: blue !important;">0.65</span>
+<span style=" font-weight: bold;    color: blue !important;">0.66</span>
 </td>
 <td style="text-align:right;">
-7.28
+9.60
 </td>
 <td style="text-align:left;">
 &lt; .001
@@ -4026,13 +5216,13 @@ M (SD)
 Agreeableness
 </td>
 <td style="text-align:left;">
-3.84 (0.58)
+3.87 (0.56)
 </td>
 <td style="text-align:left;">
-3.96 (0.51)
+3.97 (0.51)
 </td>
 <td style="text-align:left;">
-3.66 (0.52)
+3.70 (0.53)
 </td>
 </tr>
 <tr>
@@ -4040,13 +5230,13 @@ Agreeableness
 Conscientiousness
 </td>
 <td style="text-align:left;">
-3.49 (0.65)
+3.52 (0.64)
 </td>
 <td style="text-align:left;">
-3.69 (0.55)
+3.70 (0.54)
 </td>
 <td style="text-align:left;">
-3.54 (0.61)
+3.57 (0.62)
 </td>
 </tr>
 <tr>
@@ -4054,13 +5244,13 @@ Conscientiousness
 Honesty-Propriety
 </td>
 <td style="text-align:left;">
-3.70 (0.58)
+3.73 (0.57)
 </td>
 <td style="text-align:left;">
-3.81 (0.49)
+3.79 (0.50)
 </td>
 <td style="text-align:left;">
-3.42 (0.54)
+3.42 (0.55)
 </td>
 </tr>
 <tr>
@@ -4068,13 +5258,13 @@ Honesty-Propriety
 Neuroticism
 </td>
 <td style="text-align:left;">
-2.92 (0.85)
+2.88 (0.84)
 </td>
 <td style="text-align:left;">
-2.55 (0.49)
+2.54 (0.49)
 </td>
 <td style="text-align:left;">
-2.76 (0.60)
+2.74 (0.61)
 </td>
 </tr>
 <tr>
@@ -4082,13 +5272,13 @@ Neuroticism
 Extraversion
 </td>
 <td style="text-align:left;">
-3.43 (0.73)
+3.41 (0.73)
 </td>
 <td style="text-align:left;">
-3.19 (0.72)
+3.21 (0.71)
 </td>
 <td style="text-align:left;">
-3.23 (0.74)
+3.25 (0.74)
 </td>
 </tr>
 <tr>
@@ -5842,163 +7032,6 @@ Hearsay Consensus
 </tbody>
 </table>
 </div>
-</div>
-<div id="individual-difference-moderator-data-prep" class="section level2">
-<h2>Individual Difference Moderator Data Prep</h2>
-<p>Next up are the individual difference moderators. These analyses require first mean-centering predictors and creating interaction terms, which the next chunk of code does.</p>
-<pre class="r"><code>study1 &lt;-
-study1 %&gt;%
-  # First, mean center the predictors, 
-  # since this is a continuous by continuous interaction.
-  # We&#39;ll do this scale()
-  mutate(
-    # first, mean center P2 ratings for each domain
-    B_C_extraversion_cent      = scale(B_C_extraversion, scale = FALSE),
-    D_A_extraversion_cent      = scale(D_A_extraversion, scale = FALSE),
-    B_C_agreeableness_cent     = scale(B_C_agreeableness, scale = FALSE),
-    D_A_agreeableness_cent     = scale(D_A_agreeableness, scale = FALSE),
-    B_C_conscientiousness_cent = scale(B_C_conscientiousness, scale = FALSE),
-    D_A_conscientiousness_cent = scale(D_A_conscientiousness, scale = FALSE),
-    B_C_neuroticism_cent       = scale(B_C_neuroticism, scale = FALSE),
-    D_A_neuroticism_cent       = scale(D_A_neuroticism, scale = FALSE),
-    B_C_openness_cent          = scale(B_C_openness, scale = FALSE),
-    D_A_openness_cent          = scale(D_A_openness, scale = FALSE),
-    B_C_hp_cent                = scale(B_C_hp, scale = FALSE),
-    D_A_hp_cent                = scale(D_A_hp, scale = FALSE),
-    # next, mean center empathy subscales (only have B and D for this)
-    # this is a proposed moderator of consensus/accuracy
-    B_iri_perspective_cent     = scale(B_iri_perspective, scale = FALSE),
-    D_iri_perspective_cent     = scale(D_iri_perspective, scale = FALSE),
-    B_iri_empathic_cent        = scale(B_iri_empathic, scale = FALSE),
-    D_iri_empathic_cent        = scale(D_iri_empathic, scale = FALSE),
-    B_iri_distress_cent        = scale(B_iri_distress, scale = FALSE),
-    D_iri_distress_cent        = scale(D_iri_distress, scale = FALSE),
-    B_iri_fantasy_cent         = scale(B_iri_fantasy, scale = FALSE),
-    D_iri_fantasy_cent         = scale(D_iri_fantasy, scale = FALSE),
-    # mean center self-reported extraversion
-    # this is a proposed moderator of consensus/accuracy
-    A_A_extraversion_cent      = scale(A_A_extraversion, scale = FALSE),
-    C_C_extraversion_cent      = scale(C_C_extraversion, scale = FALSE),
-    A_C_extraversion_cent      = scale(A_C_extraversion, scale = FALSE),
-    C_A_extraversion_cent      = scale(C_A_extraversion, scale = FALSE),
-    B_B_extraversion_cent      = scale(B_B_extraversion, scale = FALSE),
-    D_D_extraversion_cent      = scale(D_D_extraversion, scale = FALSE)) %&gt;% 
-  # Next, create interaction terms
-  mutate(
-    # Extraversion moderators (for extraversion)
-    extraXextra_AB = A_A_extraversion_cent*B_C_extraversion_cent,
-    extraXextra_CD = C_C_extraversion_cent*D_A_extraversion_cent,
-    extraXextra_BB = B_B_extraversion_cent*B_C_extraversion_cent,
-    extraXextra_DD = D_D_extraversion_cent*D_A_extraversion_cent,
-    extraXextra_CB = C_C_extraversion_cent*B_C_extraversion_cent,
-    extraXextra_AD = A_A_extraversion_cent*D_A_extraversion_cent,
-    # Extraversion moderators (for agreeableness)
-    extraXagree_AB = A_A_extraversion_cent*B_C_agreeableness_cent,
-    extraXagree_CD = C_C_extraversion_cent*D_A_agreeableness_cent,
-    extraXagree_BB = B_B_extraversion_cent*B_C_agreeableness_cent,
-    extraXagree_DD = D_D_extraversion_cent*D_A_agreeableness_cent,
-    extraXagree_CB = C_C_extraversion_cent*B_C_agreeableness_cent,
-    extraXagree_AD = A_A_extraversion_cent*D_A_agreeableness_cent,
-    # Extraversion moderators (for conscientiousness)
-    extraXconsc_AB = A_A_extraversion_cent*B_C_conscientiousness_cent,
-    extraXconsc_CD = C_C_extraversion_cent*D_A_conscientiousness_cent,
-    extraXconsc_BB = B_B_extraversion_cent*B_C_conscientiousness_cent,
-    extraXconsc_DD = D_D_extraversion_cent*D_A_conscientiousness_cent,
-    extraXconsc_CB = C_C_extraversion_cent*B_C_conscientiousness_cent,
-    extraXconsc_AD = A_A_extraversion_cent*D_A_conscientiousness_cent,
-    # Extraversion moderators (for Neuroticism)
-    extraXneuro_AB = A_A_extraversion_cent*B_C_neuroticism_cent,
-    extraXneuro_CD = C_C_extraversion_cent*D_A_neuroticism_cent,
-    extraXneuro_BB = B_B_extraversion_cent*B_C_neuroticism_cent,
-    extraXneuro_DD = D_D_extraversion_cent*D_A_neuroticism_cent,
-    extraXneuro_CB = C_C_extraversion_cent*B_C_neuroticism_cent,
-    extraXneuro_AD = A_A_extraversion_cent*D_A_neuroticism_cent,
-    # Extraversion moderators (for Openness)
-    extraXopen_AB = A_A_extraversion_cent*B_C_openness_cent,
-    extraXopen_CD = C_C_extraversion_cent*D_A_openness_cent,
-    extraXopen_BB = B_B_extraversion_cent*B_C_openness_cent,
-    extraXopen_DD = D_D_extraversion_cent*D_A_openness_cent,
-    extraXopen_CB = C_C_extraversion_cent*B_C_openness_cent,
-    extraXopen_AD = A_A_extraversion_cent*D_A_openness_cent,
-    # Extraversion moderators (for HP)
-    extraXhp_AB = A_A_extraversion_cent*B_C_hp_cent,
-    extraXhp_CD = C_C_extraversion_cent*D_A_hp_cent,
-    extraXhp_BB = B_B_extraversion_cent*B_C_hp_cent,
-    extraXhp_DD = D_D_extraversion_cent*D_A_hp_cent,
-    extraXhp_CB = C_C_extraversion_cent*B_C_hp_cent,
-    extraXhp_AD = A_A_extraversion_cent*D_A_hp_cent,
-    # perspective taking moderators (for extraversion)
-    PTxE_B = B_iri_perspective_cent*B_C_extraversion_cent,
-    PTxE_D = D_iri_perspective_cent*D_A_extraversion_cent,
-    # perspective taking moderators (for agreeableness)
-    PTxA_B = B_iri_perspective_cent*B_C_agreeableness_cent,
-    PTxA_D = D_iri_perspective_cent*D_A_agreeableness_cent,
-    # perspective taking moderators (for conscientiousness)
-    PTxC_B = B_iri_perspective_cent*B_C_conscientiousness_cent,
-    PTxC_D = D_iri_perspective_cent*D_A_conscientiousness_cent,
-    # perspective taking moderators (for neuroticism)
-    PTxN_B = B_iri_perspective_cent*B_C_neuroticism_cent,
-    PTxN_D = D_iri_perspective_cent*D_A_neuroticism_cent,
-    # perspective taking moderators (for openness)
-    PTxO_B = B_iri_perspective_cent*B_C_openness_cent,
-    PTxO_D = D_iri_perspective_cent*D_A_openness_cent,
-    # perspective taking moderators (for hp)
-    PTxHP_B = B_iri_perspective_cent*B_C_hp_cent,
-    PTxHP_D = D_iri_perspective_cent*D_A_hp_cent,
-    # empathic concern moderators (for extraversion)
-    empxE_B = B_iri_empathic_cent*B_C_extraversion_cent,
-    empxE_D = D_iri_empathic_cent*D_A_extraversion_cent,
-    # empathic concern moderators (for agreeableness)
-    empxA_B = B_iri_empathic_cent*B_C_agreeableness_cent,
-    empxA_D = D_iri_empathic_cent*D_A_agreeableness_cent,
-    # empathic concern moderators (for conscientiousness)
-    empxC_B = B_iri_empathic_cent*B_C_conscientiousness_cent,
-    empxC_D = D_iri_empathic_cent*D_A_conscientiousness_cent,
-    # empathic concern moderators (for neuroticism)
-    empxN_B = B_iri_empathic_cent*B_C_neuroticism_cent,
-    empxN_D = D_iri_empathic_cent*D_A_neuroticism_cent,
-    # empathic concern moderators (for openness)
-    empxO_B = B_iri_empathic_cent*B_C_openness_cent,
-    empxO_D = D_iri_empathic_cent*D_A_openness_cent,
-    # empathic concern moderators (for hp)
-    empxHP_B = B_iri_empathic_cent*B_C_hp_cent,
-    empxHP_D = D_iri_empathic_cent*D_A_hp_cent,
-    # personal distress moderators (for extraversion)
-    disxE_B = B_iri_distress_cent*B_C_extraversion_cent,
-    disxE_D = D_iri_distress_cent*D_A_extraversion_cent,
-    # personal distress moderators (for agreeableness)
-    disxA_B = B_iri_distress_cent*B_C_agreeableness_cent,
-    disxA_D = D_iri_distress_cent*D_A_agreeableness_cent,
-    # personal distress moderators (for conscientiousness)
-    disxC_B = B_iri_distress_cent*B_C_conscientiousness_cent,
-    disxC_D = D_iri_distress_cent*D_A_conscientiousness_cent,
-    # personal distress moderators (for neuroticism)
-    disxN_B = B_iri_distress_cent*B_C_neuroticism_cent,
-    disxN_D = D_iri_distress_cent*D_A_neuroticism_cent,
-    # personal distress moderators (for openness)
-    disxO_B = B_iri_distress_cent*B_C_openness_cent,
-    disxO_D = D_iri_distress_cent*D_A_openness_cent,
-    # personal distress moderators (for hp)
-    disxHP_B = B_iri_distress_cent*B_C_hp_cent,
-    disxHP_D = D_iri_distress_cent*D_A_hp_cent,
-    # fantasy moderators (for extraversion)
-    fantxE_B = B_iri_fantasy_cent*B_C_extraversion_cent,
-    fantxE_D = D_iri_fantasy_cent*D_A_extraversion_cent,
-    # fantasy moderators (for agreeableness)
-    fantxA_B = B_iri_fantasy_cent*B_C_agreeableness_cent,
-    fantxA_D = D_iri_fantasy_cent*D_A_agreeableness_cent,
-    # fantasy moderators (for conscientiousness)
-    fantxC_B = B_iri_fantasy_cent*B_C_conscientiousness_cent,
-    fantxC_D = D_iri_fantasy_cent*D_A_conscientiousness_cent,
-    # fantasy moderators (for neuroticism)
-    fantxN_B = B_iri_fantasy_cent*B_C_neuroticism_cent,
-    fantxN_D = D_iri_fantasy_cent*D_A_neuroticism_cent,
-    # fantasy moderators (for openness)
-    fantxO_B = B_iri_fantasy_cent*B_C_openness_cent,
-    fantxO_D = D_iri_fantasy_cent*D_A_openness_cent,
-    # fantasy moderators (for hp)
-    fantxHP_B = B_iri_fantasy_cent*B_C_hp_cent,
-    fantxHP_D = D_iri_fantasy_cent*D_A_hp_cent)</code></pre>
 </div>
 <div id="extraversion-moderating-hearsay-consensus" class="section level2">
 <h2>Extraversion Moderating Hearsay Consensus</h2>
@@ -22468,163 +23501,6 @@ Openness
 </tbody>
 </table>
 </div>
-</div>
-<div id="study-2-integrated-individual-difference-moderator-data-prep" class="section level2">
-<h2>Study 2 &amp; Integrated Individual Difference Moderator Data Prep</h2>
-<p>Next up are the individual difference moderators. Like in Study 1, these analyses require first mean-centering predictors and creating interaction terms, which the next chunk of code does.</p>
-<pre class="r"><code>integrated &lt;-
-integrated %&gt;%
-  # First, mean center the predictors, 
-  # since this is a continuous by continuous interaction.
-  # We&#39;ll do this scale()
-  mutate(
-    # first, mean center P2 ratings for each domain
-    B_C_extraversion_cent      = scale(B_C_extraversion, scale = FALSE),
-    D_A_extraversion_cent      = scale(D_A_extraversion, scale = FALSE),
-    B_C_agreeableness_cent     = scale(B_C_agreeableness, scale = FALSE),
-    D_A_agreeableness_cent     = scale(D_A_agreeableness, scale = FALSE),
-    B_C_conscientiousness_cent = scale(B_C_conscientiousness, scale = FALSE),
-    D_A_conscientiousness_cent = scale(D_A_conscientiousness, scale = FALSE),
-    B_C_neuroticism_cent       = scale(B_C_neuroticism, scale = FALSE),
-    D_A_neuroticism_cent       = scale(D_A_neuroticism, scale = FALSE),
-    B_C_openness_cent          = scale(B_C_openness, scale = FALSE),
-    D_A_openness_cent          = scale(D_A_openness, scale = FALSE),
-    B_C_hp_cent                = scale(B_C_hp, scale = FALSE),
-    D_A_hp_cent                = scale(D_A_hp, scale = FALSE),
-    # next, mean center empathy subscales (only have B and D for this)
-    # this is a proposed moderator of consensus/accuracy
-    B_iri_perspective_cent     = scale(B_iri_perspective, scale = FALSE),
-    D_iri_perspective_cent     = scale(D_iri_perspective, scale = FALSE),
-    B_iri_empathic_cent        = scale(B_iri_empathic, scale = FALSE),
-    D_iri_empathic_cent        = scale(D_iri_empathic, scale = FALSE),
-    B_iri_distress_cent        = scale(B_iri_distress, scale = FALSE),
-    D_iri_distress_cent        = scale(D_iri_distress, scale = FALSE),
-    B_iri_fantasy_cent         = scale(B_iri_fantasy, scale = FALSE),
-    D_iri_fantasy_cent         = scale(D_iri_fantasy, scale = FALSE),
-    # mean center self-reported extraversion
-    # this is a proposed moderator of consensus/accuracy
-    A_A_extraversion_cent      = scale(A_A_extraversion, scale = FALSE),
-    C_C_extraversion_cent      = scale(C_C_extraversion, scale = FALSE),
-    A_C_extraversion_cent      = scale(A_C_extraversion, scale = FALSE),
-    C_A_extraversion_cent      = scale(C_A_extraversion, scale = FALSE),
-    B_B_extraversion_cent      = scale(B_B_extraversion, scale = FALSE),
-    D_D_extraversion_cent      = scale(D_D_extraversion, scale = FALSE)) %&gt;% 
-  # Next, create interaction terms
-  mutate(
-    # Extraversion moderators (for extraversion)
-    extraXextra_AB = A_A_extraversion_cent*B_C_extraversion_cent,
-    extraXextra_CD = C_C_extraversion_cent*D_A_extraversion_cent,
-    extraXextra_BB = B_B_extraversion_cent*B_C_extraversion_cent,
-    extraXextra_DD = D_D_extraversion_cent*D_A_extraversion_cent,
-    extraXextra_CB = C_C_extraversion_cent*B_C_extraversion_cent,
-    extraXextra_AD = A_A_extraversion_cent*D_A_extraversion_cent,
-    # Extraversion moderators (for agreeableness)
-    extraXagree_AB = A_A_extraversion_cent*B_C_agreeableness_cent,
-    extraXagree_CD = C_C_extraversion_cent*D_A_agreeableness_cent,
-    extraXagree_BB = B_B_extraversion_cent*B_C_agreeableness_cent,
-    extraXagree_DD = D_D_extraversion_cent*D_A_agreeableness_cent,
-    extraXagree_CB = C_C_extraversion_cent*B_C_agreeableness_cent,
-    extraXagree_AD = A_A_extraversion_cent*D_A_agreeableness_cent,
-    # Extraversion moderators (for conscientiousness)
-    extraXconsc_AB = A_A_extraversion_cent*B_C_conscientiousness_cent,
-    extraXconsc_CD = C_C_extraversion_cent*D_A_conscientiousness_cent,
-    extraXconsc_BB = B_B_extraversion_cent*B_C_conscientiousness_cent,
-    extraXconsc_DD = D_D_extraversion_cent*D_A_conscientiousness_cent,
-    extraXconsc_CB = C_C_extraversion_cent*B_C_conscientiousness_cent,
-    extraXconsc_AD = A_A_extraversion_cent*D_A_conscientiousness_cent,
-    # Extraversion moderators (for Neuroticism)
-    extraXneuro_AB = A_A_extraversion_cent*B_C_neuroticism_cent,
-    extraXneuro_CD = C_C_extraversion_cent*D_A_neuroticism_cent,
-    extraXneuro_BB = B_B_extraversion_cent*B_C_neuroticism_cent,
-    extraXneuro_DD = D_D_extraversion_cent*D_A_neuroticism_cent,
-    extraXneuro_CB = C_C_extraversion_cent*B_C_neuroticism_cent,
-    extraXneuro_AD = A_A_extraversion_cent*D_A_neuroticism_cent,
-    # Extraversion moderators (for Openness)
-    extraXopen_AB = A_A_extraversion_cent*B_C_openness_cent,
-    extraXopen_CD = C_C_extraversion_cent*D_A_openness_cent,
-    extraXopen_BB = B_B_extraversion_cent*B_C_openness_cent,
-    extraXopen_DD = D_D_extraversion_cent*D_A_openness_cent,
-    extraXopen_CB = C_C_extraversion_cent*B_C_openness_cent,
-    extraXopen_AD = A_A_extraversion_cent*D_A_openness_cent,
-    # Extraversion moderators (for HP)
-    extraXhp_AB = A_A_extraversion_cent*B_C_hp_cent,
-    extraXhp_CD = C_C_extraversion_cent*D_A_hp_cent,
-    extraXhp_BB = B_B_extraversion_cent*B_C_hp_cent,
-    extraXhp_DD = D_D_extraversion_cent*D_A_hp_cent,
-    extraXhp_CB = C_C_extraversion_cent*B_C_hp_cent,
-    extraXhp_AD = A_A_extraversion_cent*D_A_hp_cent,
-    # perspective taking moderators (for extraversion)
-    PTxE_B = B_iri_perspective_cent*B_C_extraversion_cent,
-    PTxE_D = D_iri_perspective_cent*D_A_extraversion_cent,
-    # perspective taking moderators (for agreeableness)
-    PTxA_B = B_iri_perspective_cent*B_C_agreeableness_cent,
-    PTxA_D = D_iri_perspective_cent*D_A_agreeableness_cent,
-    # perspective taking moderators (for conscientiousness)
-    PTxC_B = B_iri_perspective_cent*B_C_conscientiousness_cent,
-    PTxC_D = D_iri_perspective_cent*D_A_conscientiousness_cent,
-    # perspective taking moderators (for neuroticism)
-    PTxN_B = B_iri_perspective_cent*B_C_neuroticism_cent,
-    PTxN_D = D_iri_perspective_cent*D_A_neuroticism_cent,
-    # perspective taking moderators (for openness)
-    PTxO_B = B_iri_perspective_cent*B_C_openness_cent,
-    PTxO_D = D_iri_perspective_cent*D_A_openness_cent,
-    # perspective taking moderators (for hp)
-    PTxHP_B = B_iri_perspective_cent*B_C_hp_cent,
-    PTxHP_D = D_iri_perspective_cent*D_A_hp_cent,
-    # empathic concern moderators (for extraversion)
-    empxE_B = B_iri_empathic_cent*B_C_extraversion_cent,
-    empxE_D = D_iri_empathic_cent*D_A_extraversion_cent,
-    # empathic concern moderators (for agreeableness)
-    empxA_B = B_iri_empathic_cent*B_C_agreeableness_cent,
-    empxA_D = D_iri_empathic_cent*D_A_agreeableness_cent,
-    # empathic concern moderators (for conscientiousness)
-    empxC_B = B_iri_empathic_cent*B_C_conscientiousness_cent,
-    empxC_D = D_iri_empathic_cent*D_A_conscientiousness_cent,
-    # empathic concern moderators (for neuroticism)
-    empxN_B = B_iri_empathic_cent*B_C_neuroticism_cent,
-    empxN_D = D_iri_empathic_cent*D_A_neuroticism_cent,
-    # empathic concern moderators (for openness)
-    empxO_B = B_iri_empathic_cent*B_C_openness_cent,
-    empxO_D = D_iri_empathic_cent*D_A_openness_cent,
-    # empathic concern moderators (for hp)
-    empxHP_B = B_iri_empathic_cent*B_C_hp_cent,
-    empxHP_D = D_iri_empathic_cent*D_A_hp_cent,
-    # personal distress moderators (for extraversion)
-    disxE_B = B_iri_distress_cent*B_C_extraversion_cent,
-    disxE_D = D_iri_distress_cent*D_A_extraversion_cent,
-    # personal distress moderators (for agreeableness)
-    disxA_B = B_iri_distress_cent*B_C_agreeableness_cent,
-    disxA_D = D_iri_distress_cent*D_A_agreeableness_cent,
-    # personal distress moderators (for conscientiousness)
-    disxC_B = B_iri_distress_cent*B_C_conscientiousness_cent,
-    disxC_D = D_iri_distress_cent*D_A_conscientiousness_cent,
-    # personal distress moderators (for neuroticism)
-    disxN_B = B_iri_distress_cent*B_C_neuroticism_cent,
-    disxN_D = D_iri_distress_cent*D_A_neuroticism_cent,
-    # personal distress moderators (for openness)
-    disxO_B = B_iri_distress_cent*B_C_openness_cent,
-    disxO_D = D_iri_distress_cent*D_A_openness_cent,
-    # personal distress moderators (for hp)
-    disxHP_B = B_iri_distress_cent*B_C_hp_cent,
-    disxHP_D = D_iri_distress_cent*D_A_hp_cent,
-    # fantasy moderators (for extraversion)
-    fantxE_B = B_iri_fantasy_cent*B_C_extraversion_cent,
-    fantxE_D = D_iri_fantasy_cent*D_A_extraversion_cent,
-    # fantasy moderators (for agreeableness)
-    fantxA_B = B_iri_fantasy_cent*B_C_agreeableness_cent,
-    fantxA_D = D_iri_fantasy_cent*D_A_agreeableness_cent,
-    # fantasy moderators (for conscientiousness)
-    fantxC_B = B_iri_fantasy_cent*B_C_conscientiousness_cent,
-    fantxC_D = D_iri_fantasy_cent*D_A_conscientiousness_cent,
-    # fantasy moderators (for neuroticism)
-    fantxN_B = B_iri_fantasy_cent*B_C_neuroticism_cent,
-    fantxN_D = D_iri_fantasy_cent*D_A_neuroticism_cent,
-    # fantasy moderators (for openness)
-    fantxO_B = B_iri_fantasy_cent*B_C_openness_cent,
-    fantxO_D = D_iri_fantasy_cent*D_A_openness_cent,
-    # fantasy moderators (for hp)
-    fantxHP_B = B_iri_fantasy_cent*B_C_hp_cent,
-    fantxHP_D = D_iri_fantasy_cent*D_A_hp_cent)</code></pre>
 </div>
 <div id="study-2-integrated-extraversion-moderating-hearsay-consensus" class="section level2">
 <h2>Study 2 &amp; Integrated: Extraversion Moderating Hearsay Consensus</h2>
