@@ -1,0 +1,60 @@
+---
+title: "Subsetting Data for Variables in 'Perceiving through the Grapevine' Manuscript"
+author: "REDACTED FOR MASKED REVIEW"
+date: "last knitted: `r Sys.time()`"
+output: html_document
+---
+# What is this file?
+
+Here I'll read in the full (cleaned, scored, reshaped) datasets, subset them for the variables used in the manuscript (item-level, not scale scores), and write out these subsetted files. For the time being, we're posting just these subsetted files, but will make the full data available in the future. 
+
+# Read in Data
+```{r}
+library(rio)
+library(tidyverse)
+
+study1 <- import("../../Data/Study_1/wide_data/rep_s1_full_wide_data.csv")
+study2 <- import("../../Data/Study_2/wide_data/rep_s2_full_wide_data.csv")
+```
+
+# Selecting Vars needed in Analyses
+
+## Study 1
+```{r}
+study1 %>% 
+  select(sess_id, 
+        # BFI items. Which includes hp items,
+        # which are not bfi items, but have bfi
+        # in their labels to make thing easy.
+         contains("bfi"),
+        # IRI items, which all start with B_q or D_q
+         starts_with("B_q"),
+         starts_with("D_q"),
+         # remove ratings we didn't pre-reg/use
+         -starts_with("A_B"),
+         -starts_with("B_A"),
+         -starts_with("C_D"),
+         -starts_with("D_C")) %>% 
+  export("Data/rep_s1_4ms.csv")
+```
+
+## Study 2
+```{r}
+study2 %>% 
+  select(sess_id, 
+         condition,
+         contains("bfi"),
+         # and the social decision qs
+         contains("goodleader"),
+         contains("goodfriend"),
+         # IRI items, which all start with B_q or D_q
+         starts_with("B_q"),
+         starts_with("D_q"),
+         # remove ratings we didn't pre-reg/use
+         # remove ratings we didn't pre-reg/use
+         -starts_with("A_B"),
+         -starts_with("B_A"),
+         -starts_with("C_D"),
+         -starts_with("D_C")) %>% 
+  export("Data/rep_s2_4ms.csv")
+```
