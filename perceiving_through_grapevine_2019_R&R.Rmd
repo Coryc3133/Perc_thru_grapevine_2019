@@ -33,7 +33,7 @@ item_eval <- import("Data/rep_BigSix_evaluativeness.csv")
 
 ## Reshape Study 1 Data for Profile Analyses
 
-```{r}
+```{r study1_reshape_profiles}
 study1_profiles <- 
   study1 %>% 
   select(sess_id, contains("bfi")) %>% 
@@ -63,7 +63,7 @@ study1_profiles <-
 
 ## Reshape Study 2 Data for Profile Analyses
 
-```{r}
+```{r study2_reshape_profiles}
 study2_profiles <- 
   study2 %>% 
   select(sess_id, contains("bfi")) %>% 
@@ -91,23 +91,15 @@ study2_profiles <-
          p1_dist = p1 - p1_norm)
 ```
 
-## Combining Study 1 and 2 for integrated analyses
-
-```{r}
-integrated_profiles <- 
-  rbind(study1_profiles, study2_profiles)
-```
-
-
 ## ICCs and profile for Item Evaluativeness
 ### ICC
-```{r}
+```{r icc_eval}
 item_eval %>% 
   t() %>% 
   psych::ICC()
 ```
 ### Calculating Item Evaluativeness Profile
-```{r}
+```{r eval_profile}
 item_eval_prof <- item_eval %>% 
   gather(item, rating, -subj) %>% 
   # mid-point center it
@@ -120,7 +112,7 @@ item_eval_prof <- item_eval %>%
 
 #### Joining to other data
 
-```{r}
+```{r join_eval}
 # study 1
 study1_profiles <- study1_profiles %>% 
   left_join(item_eval_prof)
@@ -451,18 +443,29 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
+```{r study1_accuracy_sam}
 study1_profiles2 <- study1_profiles %>% 
   select(sess_id, triad_id, item, self_norm, self_dist, eval, p1, p2) %>% 
   gather(distance, rating, -(sess_id:eval))
 
-accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + eval + distance +
+study1_accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + eval + distance +
                                distance:self_norm + distance:self_dist + distance:eval +
                                (1 + self_norm + self_dist + distance +
                                   distance:self_norm + distance:self_dist + distance:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles2)
-summary(accuracy_sam_combined)
+summary(study1_accuracy_sam_combined)
+```
+
+### Simple Slope for p2
+
+```{r study1_simple_accuracy_p2}
+
+study1_accuracy_simple_sam_p2 <- lmer(rating ~ self_norm + self_dist + eval +
+                               (1 + self_norm + self_dist + eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(study1_accuracy_sam_combined)
 ```
 
 ## P1-P2 Agreement 
@@ -483,19 +486,19 @@ $\beta_{20g} = \gamma_{200} + u_{20g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$  
 
 *i* = item; *t* = triad; *g* = group
-```{r}
-consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + eval +
+```{r study1_p1p2_consensus_sam}
+study1_consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + eval +
                          (1 + p1_norm + p1_dist + eval | sess_id/triad_id),
                        data = study1_profiles)
 
-summary(consensus_sam)
+summary(study1_consensus_sam)
 ```
 
 ## Extraversion Moderators
 
 ### adding target, P1, and P2 Extraversion to profile data
 
-```{r}
+```{r study1_add_extr_to_profs}
 # joining in target Extraversion
 study1_profiles <- study1 %>% 
   select(sess_id, ends_with("extraversion")) %>% 
@@ -554,14 +557,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + t_ext_cent +
+```{r study1_consensus_x_target_ext_sam}
+study1_consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + t_ext_cent +
                                t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval +
                                (1 + p1_norm + p1_dist + t_ext_cent +
                                   t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(consensus_sam_t_ext)
+summary(study1_consensus_sam_t_ext)
 ```
 
 #### P1 Extraversion moderating Hearsay Consensus
@@ -583,14 +586,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p1_ext_cent +
+```{r study1_consensus_x_p1_ext_sam}
+study1_consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p1_ext_cent +
                                p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval +
                                (1 + p1_norm + p1_dist + p1_ext_cent +
                                   p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(consensus_sam_p1_ext)
+summary(study1_consensus_sam_p1_ext)
 ```
 
 #### P2 Extraversion moderating Hearsay Consensus
@@ -612,14 +615,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p2_ext_cent +
+```{r study1_consensus_x_p2_ext_sam}
+study1_consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p2_ext_cent +
                                p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval +
                                (1 + p1_norm + p1_dist + p2_ext_cent +
                                   p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(consensus_sam_p2_ext)
+summary(study1_consensus_sam_p2_ext)
 ```
 
 ### Extraversion Moderating Hearsay Accuracy
@@ -642,14 +645,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + eval + t_ext_cent +
+```{r study1_accuracy_x_target_ext_sam}
+study1_accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + eval + t_ext_cent +
                                t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval +
                                (1 + self_norm + self_dist + t_ext_cent +
                                   t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(accuracy_sam_t_ext)
+summary(study1_accuracy_sam_t_ext)
 ```
 
 #### P1 Extraversion moderating Hearsay Accuracy
@@ -671,14 +674,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + eval + p1_ext_cent +
+```{r study1_accuracy_x_p1_ext_sam}
+study1_accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + eval + p1_ext_cent +
                                p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval +
                                (1 + self_norm + self_dist + p1_ext_cent +
                                   p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(accuracy_sam_p1_ext)
+summary(study1_accuracy_sam_p1_ext)
 ```
 
 #### P2 Extraversion moderating Hearsay Accuracy
@@ -700,11 +703,12 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + eval + p2_ext_cent +
+```{r study1_accuracy_x_p2_ext_sam}
+study1_accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + eval + p2_ext_cent +
                                p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval +
                                (1 + self_norm + self_dist + p2_ext_cent +
-                                  p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval | 
+                                  p2_ext_cent:self_norm + 
+                                  p2_ext_cent:self_dist + p2_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
 summary(accuracy_sam_p2_ext)
@@ -714,7 +718,7 @@ summary(accuracy_sam_p2_ext)
 
 ### adding P2 Empathy to profile data
 
-```{r}
+```{r study1_adding_emp_profs}
 # joining in P2 Empathy
 study1_profiles <- study1 %>% 
   select(sess_id, B_iri_distress, B_iri_empathic, B_iri_fantasy, B_iri_perspective,
@@ -752,14 +756,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + eval + distress_cent +
-                               distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval +
+```{r study1_consensus_x_distress}
+study1_consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + eval + distress_cent +
+                               distress_cent:p1_norm + distress_cent:p1_dist + 
+                                 distress_cent:eval +
                                (1 + p1_norm + p1_dist + distress_cent +
-                                  distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval | 
+                                  distress_cent:p1_norm + 
+                                  distress_cent:p1_dist + distress_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(consensus_sam_distress)
+summary(study1_consensus_sam_distress)
 ```
 
 #### Empathic Concern moderating Hearsay consensus
@@ -781,14 +787,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + eval + empathic_cent +
-                               empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval +
+```{r study1_consensus_x_empathic}
+study1_consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + eval + empathic_cent +
+                               empathic_cent:p1_norm + 
+                                 empathic_cent:p1_dist + empathic_cent:eval +
                                (1 + p1_norm + p1_dist + empathic_cent +
-                                  empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval | 
+                                  empathic_cent:p1_norm + 
+                                  empathic_cent:p1_dist + empathic_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(consensus_sam_empathic)
+summary(study1_consensus_sam_empathic)
 ```
 
 #### Fantasy moderating Hearsay consensus
@@ -810,14 +818,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + eval + fantasy_cent +
-                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval +
+```{r study1_consensus_x_fantasy}
+study1_consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + eval + fantasy_cent +
+                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
+                                 fantasy_cent:eval +
                                (1 + p1_norm + p1_dist + fantasy_cent +
-                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval | 
+                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
+                                  fantasy_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(consensus_sam_fantasy)
+summary(study1_consensus_sam_fantasy)
 ```
 
 ### Perspective Taking moderating Hearsay consensus
@@ -839,14 +849,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + eval + perspective_cent +
-                               perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval +
+```{r study1_consensus_x_perspective}
+study1_consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + eval + perspective_cent +
+                               perspective_cent:p1_norm + 
+                                 perspective_cent:p1_dist + perspective_cent:eval +
                                (1 + p1_norm + p1_dist + perspective_cent +
-                                  perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval | 
+                                  perspective_cent:p1_norm + 
+                                  perspective_cent:p1_dist + perspective_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(consensus_sam_perspective)
+summary(study1_consensus_sam_perspective)
 ```
 
 ### Empathy Moderating Accuracy
@@ -869,14 +881,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + eval + distress_cent +
-                               distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval +
+```{r study1_accuracy_x_distress}
+study1_accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + eval + distress_cent +
+                               distress_cent:self_norm + distress_cent:self_dist +
+                                 distress_cent:eval +
                                (1 + self_norm + self_dist + distress_cent +
-                                  distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval | 
+                                  distress_cent:self_norm + 
+                                  distress_cent:self_dist + distress_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(accuracy_sam_distress)
+summary(study1_accuracy_sam_distress)
 ```
 
 #### Empathic Concern moderating Hearsay accuracy
@@ -898,14 +912,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + eval + empathic_cent +
-                               empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval +
+```{r study1_accuracy_x_empathic}
+study1_accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + eval + empathic_cent +
+                               empathic_cent:self_norm + empathic_cent:self_dist + 
+                                 empathic_cent:eval +
                                (1 + self_norm + self_dist + empathic_cent +
-                                  empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval | 
+                                  empathic_cent:self_norm + 
+                                  empathic_cent:self_dist + empathic_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(accuracy_sam_empathic)
+summary(study1_accuracy_sam_empathic)
 ```
 
 #### Fantasy moderating Hearsay accuracy
@@ -927,14 +943,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + eval + fantasy_cent +
-                               fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval +
+```{r study1_accuracy_x_fantasy}
+study1_accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + eval + fantasy_cent +
+                               fantasy_cent:self_norm +
+                                 fantasy_cent:self_dist + fantasy_cent:eval +
                                (1 + self_norm + self_dist + fantasy_cent +
-                                  fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval | 
+                                  fantasy_cent:self_norm + 
+                                  fantasy_cent:self_dist + fantasy_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(accuracy_sam_fantasy)
+summary(study1_accuracy_sam_fantasy)
 ```
 
 #### Perspective Taking moderating Hearsay accuracy
@@ -956,16 +974,17 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + eval + perspective_cent +
-                               perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval +
+```{r study1_accuracy_x_perspective}
+study1_accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + eval + perspective_cent +
+                               perspective_cent:self_norm + 
+                                 perspective_cent:self_dist + perspective_cent:eval +
                                (1 + self_norm + self_dist + perspective_cent +
-                                  perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval | 
+                                  perspective_cent:self_norm + 
+                                  perspective_cent:self_dist + perspective_cent:eval | 
                                   sess_id/triad_id),
                              data = study1_profiles)
-summary(accuracy_sam_perspective)
+summary(study1_accuracy_sam_perspective)
 ```
-
 # Study 2 Hearsay SAM
 ## Self-P1 & Self-P2 in same model
 
@@ -988,18 +1007,29 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
+```{r study2_accuracy_sam}
 study2_profiles2 <- study2_profiles %>% 
   select(sess_id, triad_id, item, self_norm, self_dist, eval, p1, p2) %>% 
   gather(distance, rating, -(sess_id:eval))
 
-accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + eval + distance +
+study2_accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + eval + distance +
                                distance:self_norm + distance:self_dist + distance:eval +
                                (1 + self_norm + self_dist + distance +
                                   distance:self_norm + distance:self_dist + distance:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles2)
-summary(accuracy_sam_combined)
+summary(study2_accuracy_sam_combined)
+```
+
+### Simple Slope for p2
+
+```{r study2_simple_accuracy_p2}
+
+study2_accuracy_simple_sam_p2 <- lmer(rating ~ self_norm + self_dist + eval +
+                               (1 + self_norm + self_dist + eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(study2_accuracy_sam_combined)
 ```
 
 ## P1-P2 Agreement 
@@ -1020,19 +1050,19 @@ $\beta_{20g} = \gamma_{200} + u_{20g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$  
 
 *i* = item; *t* = triad; *g* = group
-```{r}
-consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + eval +
+```{r study2_p1p2_consensus_sam}
+study2_consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + eval +
                          (1 + p1_norm + p1_dist + eval | sess_id/triad_id),
                        data = study2_profiles)
 
-summary(consensus_sam)
+summary(study2_consensus_sam)
 ```
 
 ## Extraversion Moderators
 
 ### adding target, P1, and P2 Extraversion to profile data
 
-```{r}
+```{r study2_add_extr_to_profs}
 # joining in target Extraversion
 study2_profiles <- study2 %>% 
   select(sess_id, ends_with("extraversion")) %>% 
@@ -1091,14 +1121,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + t_ext_cent +
+```{r study2_consensus_x_target_ext_sam}
+study2_consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + t_ext_cent +
                                t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval +
                                (1 + p1_norm + p1_dist + t_ext_cent +
                                   t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(consensus_sam_t_ext)
+summary(study2_consensus_sam_t_ext)
 ```
 
 #### P1 Extraversion moderating Hearsay Consensus
@@ -1120,14 +1150,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p1_ext_cent +
+```{r study2_consensus_x_p1_ext_sam}
+study2_consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p1_ext_cent +
                                p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval +
                                (1 + p1_norm + p1_dist + p1_ext_cent +
                                   p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(consensus_sam_p1_ext)
+summary(study2_consensus_sam_p1_ext)
 ```
 
 #### P2 Extraversion moderating Hearsay Consensus
@@ -1149,14 +1179,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p2_ext_cent +
+```{r study2_consensus_x_p2_ext_sam}
+study2_consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p2_ext_cent +
                                p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval +
                                (1 + p1_norm + p1_dist + p2_ext_cent +
                                   p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(consensus_sam_p2_ext)
+summary(study2_consensus_sam_p2_ext)
 ```
 
 ### Extraversion Moderating Hearsay Accuracy
@@ -1179,14 +1209,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + eval + t_ext_cent +
+```{r study2_accuracy_x_target_ext_sam}
+study2_accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + eval + t_ext_cent +
                                t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval +
                                (1 + self_norm + self_dist + t_ext_cent +
                                   t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(accuracy_sam_t_ext)
+summary(study2_accuracy_sam_t_ext)
 ```
 
 #### P1 Extraversion moderating Hearsay Accuracy
@@ -1208,14 +1238,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + eval + p1_ext_cent +
+```{r study2_accuracy_x_p1_ext_sam}
+study2_accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + eval + p1_ext_cent +
                                p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval +
                                (1 + self_norm + self_dist + p1_ext_cent +
                                   p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(accuracy_sam_p1_ext)
+summary(study2_accuracy_sam_p1_ext)
 ```
 
 #### P2 Extraversion moderating Hearsay Accuracy
@@ -1237,11 +1267,12 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + eval + p2_ext_cent +
+```{r study2_accuracy_x_p2_ext_sam}
+study2_accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + eval + p2_ext_cent +
                                p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval +
                                (1 + self_norm + self_dist + p2_ext_cent +
-                                  p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval | 
+                                  p2_ext_cent:self_norm + 
+                                  p2_ext_cent:self_dist + p2_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
 summary(accuracy_sam_p2_ext)
@@ -1251,7 +1282,7 @@ summary(accuracy_sam_p2_ext)
 
 ### adding P2 Empathy to profile data
 
-```{r}
+```{r study2_adding_emp_profs}
 # joining in P2 Empathy
 study2_profiles <- study2 %>% 
   select(sess_id, B_iri_distress, B_iri_empathic, B_iri_fantasy, B_iri_perspective,
@@ -1289,14 +1320,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + eval + distress_cent +
-                               distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval +
+```{r study2_consensus_x_distress}
+study2_consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + eval + distress_cent +
+                               distress_cent:p1_norm + distress_cent:p1_dist + 
+                                 distress_cent:eval +
                                (1 + p1_norm + p1_dist + distress_cent +
-                                  distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval | 
+                                  distress_cent:p1_norm + 
+                                  distress_cent:p1_dist + distress_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(consensus_sam_distress)
+summary(study2_consensus_sam_distress)
 ```
 
 #### Empathic Concern moderating Hearsay consensus
@@ -1318,14 +1351,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + eval + empathic_cent +
-                               empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval +
+```{r study2_consensus_x_empathic}
+study2_consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + eval + empathic_cent +
+                               empathic_cent:p1_norm + 
+                                 empathic_cent:p1_dist + empathic_cent:eval +
                                (1 + p1_norm + p1_dist + empathic_cent +
-                                  empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval | 
+                                  empathic_cent:p1_norm + 
+                                  empathic_cent:p1_dist + empathic_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(consensus_sam_empathic)
+summary(study2_consensus_sam_empathic)
 ```
 
 #### Fantasy moderating Hearsay consensus
@@ -1347,14 +1382,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + eval + fantasy_cent +
-                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval +
+```{r study2_consensus_x_fantasy}
+study2_consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + eval + fantasy_cent +
+                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
+                                 fantasy_cent:eval +
                                (1 + p1_norm + p1_dist + fantasy_cent +
-                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval | 
+                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
+                                  fantasy_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(consensus_sam_fantasy)
+summary(study2_consensus_sam_fantasy)
 ```
 
 ### Perspective Taking moderating Hearsay consensus
@@ -1376,14 +1413,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + eval + perspective_cent +
-                               perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval +
+```{r study2_consensus_x_perspective}
+study2_consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + eval + perspective_cent +
+                               perspective_cent:p1_norm + 
+                                 perspective_cent:p1_dist + perspective_cent:eval +
                                (1 + p1_norm + p1_dist + perspective_cent +
-                                  perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval | 
+                                  perspective_cent:p1_norm + 
+                                  perspective_cent:p1_dist + perspective_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(consensus_sam_perspective)
+summary(study2_consensus_sam_perspective)
 ```
 
 ### Empathy Moderating Accuracy
@@ -1406,14 +1445,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + eval + distress_cent +
-                               distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval +
+```{r study2_accuracy_x_distress}
+study2_accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + eval + distress_cent +
+                               distress_cent:self_norm + distress_cent:self_dist +
+                                 distress_cent:eval +
                                (1 + self_norm + self_dist + distress_cent +
-                                  distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval | 
+                                  distress_cent:self_norm + 
+                                  distress_cent:self_dist + distress_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(accuracy_sam_distress)
+summary(study2_accuracy_sam_distress)
 ```
 
 #### Empathic Concern moderating Hearsay accuracy
@@ -1435,14 +1476,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + eval + empathic_cent +
-                               empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval +
+```{r study2_accuracy_x_empathic}
+study2_accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + eval + empathic_cent +
+                               empathic_cent:self_norm + empathic_cent:self_dist + 
+                                 empathic_cent:eval +
                                (1 + self_norm + self_dist + empathic_cent +
-                                  empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval | 
+                                  empathic_cent:self_norm + 
+                                  empathic_cent:self_dist + empathic_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(accuracy_sam_empathic)
+summary(study2_accuracy_sam_empathic)
 ```
 
 #### Fantasy moderating Hearsay accuracy
@@ -1464,14 +1507,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + eval + fantasy_cent +
-                               fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval +
+```{r study2_accuracy_x_fantasy}
+study2_accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + eval + fantasy_cent +
+                               fantasy_cent:self_norm +
+                                 fantasy_cent:self_dist + fantasy_cent:eval +
                                (1 + self_norm + self_dist + fantasy_cent +
-                                  fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval | 
+                                  fantasy_cent:self_norm + 
+                                  fantasy_cent:self_dist + fantasy_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(accuracy_sam_fantasy)
+summary(study2_accuracy_sam_fantasy)
 ```
 
 #### Perspective Taking moderating Hearsay accuracy
@@ -1493,20 +1538,24 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + eval + perspective_cent +
-                               perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval +
+```{r study2_accuracy_x_perspective}
+study2_accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + eval + perspective_cent +
+                               perspective_cent:self_norm + 
+                                 perspective_cent:self_dist + perspective_cent:eval +
                                (1 + self_norm + self_dist + perspective_cent +
-                                  perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval | 
+                                  perspective_cent:self_norm + 
+                                  perspective_cent:self_dist + perspective_cent:eval | 
                                   sess_id/triad_id),
                              data = study2_profiles)
-summary(accuracy_sam_perspective)
+summary(study2_accuracy_sam_perspective)
 ```
 # Integrated Hearsay SAM
-## Combine Data
-```{r}
-integrated_profiles <- rbind(study1_profiles,
-                             study2_profiles)
+
+## Combining Study 1 and 2 for integrated analyses
+
+```{r combine_data}
+integrated_profiles <- 
+  rbind(study1_profiles, study2_profiles)
 ```
 
 ## Self-P1 & Self-P2 in same model
@@ -1530,18 +1579,29 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
+```{r integrated_accuracy_sam}
 integrated_profiles2 <- integrated_profiles %>% 
   select(sess_id, triad_id, item, self_norm, self_dist, eval, p1, p2) %>% 
   gather(distance, rating, -(sess_id:eval))
 
-accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + eval + distance +
+integrated_accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + eval + distance +
                                distance:self_norm + distance:self_dist + distance:eval +
                                (1 + self_norm + self_dist + distance +
                                   distance:self_norm + distance:self_dist + distance:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles2)
-summary(accuracy_sam_combined)
+summary(integrated_accuracy_sam_combined)
+```
+
+### Simple Slope for p2
+
+```{r integrated_simple_accuracy_p2}
+
+integrated_accuracy_simple_sam_p2 <- lmer(rating ~ self_norm + self_dist + eval +
+                               (1 + self_norm + self_dist + eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(integrated_accuracy_sam_combined)
 ```
 
 ## P1-P2 Agreement 
@@ -1562,12 +1622,12 @@ $\beta_{20g} = \gamma_{200} + u_{20g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$  
 
 *i* = item; *t* = triad; *g* = group
-```{r}
-consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + eval +
+```{r integrated_p1p2_consensus_sam}
+integrated_consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + eval +
                          (1 + p1_norm + p1_dist + eval | sess_id/triad_id),
                        data = integrated_profiles)
 
-summary(consensus_sam)
+summary(integrated_consensus_sam)
 ```
 
 ## Extraversion Moderators
@@ -1592,14 +1652,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + t_ext_cent +
+```{r integrated_consensus_x_target_ext_sam}
+integrated_consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + t_ext_cent +
                                t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval +
                                (1 + p1_norm + p1_dist + t_ext_cent +
                                   t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(consensus_sam_t_ext)
+summary(integrated_consensus_sam_t_ext)
 ```
 
 #### P1 Extraversion moderating Hearsay Consensus
@@ -1621,14 +1681,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p1_ext_cent +
+```{r integrated_consensus_x_p1_ext_sam}
+integrated_consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p1_ext_cent +
                                p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval +
                                (1 + p1_norm + p1_dist + p1_ext_cent +
                                   p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(consensus_sam_p1_ext)
+summary(integrated_consensus_sam_p1_ext)
 ```
 
 #### P2 Extraversion moderating Hearsay Consensus
@@ -1650,14 +1710,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p2_ext_cent +
+```{r integrated_consensus_x_p2_ext_sam}
+integrated_consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p2_ext_cent +
                                p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval +
                                (1 + p1_norm + p1_dist + p2_ext_cent +
                                   p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(consensus_sam_p2_ext)
+summary(integrated_consensus_sam_p2_ext)
 ```
 
 ### Extraversion Moderating Hearsay Accuracy
@@ -1680,14 +1740,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + eval + t_ext_cent +
+```{r integrated_accuracy_x_target_ext_sam}
+integrated_accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + eval + t_ext_cent +
                                t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval +
                                (1 + self_norm + self_dist + t_ext_cent +
                                   t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(accuracy_sam_t_ext)
+summary(integrated_accuracy_sam_t_ext)
 ```
 
 #### P1 Extraversion moderating Hearsay Accuracy
@@ -1709,14 +1769,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + eval + p1_ext_cent +
+```{r integrated_accuracy_x_p1_ext_sam}
+integrated_accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + eval + p1_ext_cent +
                                p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval +
                                (1 + self_norm + self_dist + p1_ext_cent +
                                   p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(accuracy_sam_p1_ext)
+summary(integrated_accuracy_sam_p1_ext)
 ```
 
 #### P2 Extraversion moderating Hearsay Accuracy
@@ -1738,17 +1798,38 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + eval + p2_ext_cent +
+```{r integrated_accuracy_x_p2_ext_sam}
+integrated_accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + eval + p2_ext_cent +
                                p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval +
                                (1 + self_norm + self_dist + p2_ext_cent +
-                                  p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval | 
+                                  p2_ext_cent:self_norm + 
+                                  p2_ext_cent:self_dist + p2_ext_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
 summary(accuracy_sam_p2_ext)
 ```
 
 ## Empathy Moderators
+
+### adding P2 Empathy to profile data
+
+```{r integrated_adding_emp_profs}
+# joining in P2 Empathy
+integrated_profiles <- integrated %>% 
+  select(sess_id, B_iri_distress, B_iri_empathic, B_iri_fantasy, B_iri_perspective,
+         D_iri_distress, D_iri_empathic, D_iri_fantasy, D_iri_perspective) %>% 
+  gather(var, value, -sess_id) %>% 
+  separate(var, c("p2", "elim", "variable")) %>%
+  mutate(triad_id = ifelse(p2 == "B", "CAB", "ACD")) %>%
+  spread(variable, value) %>% 
+  mutate(distress_cent = distress - mean(distress, na.rm = TRUE),
+         empathic_cent = empathic - mean(empathic, na.rm = TRUE),
+         fantasy_cent = fantasy - mean(fantasy, na.rm = TRUE),
+         perspective_cent = perspective - mean(perspective, na.rm = TRUE))%>% 
+  select(sess_id, triad_id, distress_cent, empathic_cent,
+         fantasy_cent, perspective_cent) %>% 
+  right_join(integrated_profiles)
+```
 
 ### Empathy Moderating Consensus
 #### Distress moderating Hearsay consensus
@@ -1770,14 +1851,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + eval + distress_cent +
-                               distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval +
+```{r integrated_consensus_x_distress}
+integrated_consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + eval + distress_cent +
+                               distress_cent:p1_norm + distress_cent:p1_dist + 
+                                 distress_cent:eval +
                                (1 + p1_norm + p1_dist + distress_cent +
-                                  distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval | 
+                                  distress_cent:p1_norm + 
+                                  distress_cent:p1_dist + distress_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(consensus_sam_distress)
+summary(integrated_consensus_sam_distress)
 ```
 
 #### Empathic Concern moderating Hearsay consensus
@@ -1799,14 +1882,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + eval + empathic_cent +
-                               empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval +
+```{r integrated_consensus_x_empathic}
+integrated_consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + eval + empathic_cent +
+                               empathic_cent:p1_norm + 
+                                 empathic_cent:p1_dist + empathic_cent:eval +
                                (1 + p1_norm + p1_dist + empathic_cent +
-                                  empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval | 
+                                  empathic_cent:p1_norm + 
+                                  empathic_cent:p1_dist + empathic_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(consensus_sam_empathic)
+summary(integrated_consensus_sam_empathic)
 ```
 
 #### Fantasy moderating Hearsay consensus
@@ -1828,14 +1913,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + eval + fantasy_cent +
-                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval +
+```{r integrated_consensus_x_fantasy}
+integrated_consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + eval + fantasy_cent +
+                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
+                                 fantasy_cent:eval +
                                (1 + p1_norm + p1_dist + fantasy_cent +
-                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval | 
+                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
+                                  fantasy_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(consensus_sam_fantasy)
+summary(integrated_consensus_sam_fantasy)
 ```
 
 ### Perspective Taking moderating Hearsay consensus
@@ -1857,14 +1944,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + eval + perspective_cent +
-                               perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval +
+```{r integrated_consensus_x_perspective}
+integrated_consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + eval + perspective_cent +
+                               perspective_cent:p1_norm + 
+                                 perspective_cent:p1_dist + perspective_cent:eval +
                                (1 + p1_norm + p1_dist + perspective_cent +
-                                  perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval | 
+                                  perspective_cent:p1_norm + 
+                                  perspective_cent:p1_dist + perspective_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(consensus_sam_perspective)
+summary(integrated_consensus_sam_perspective)
 ```
 
 ### Empathy Moderating Accuracy
@@ -1887,14 +1976,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + eval + distress_cent +
-                               distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval +
+```{r integrated_accuracy_x_distress}
+integrated_accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + eval + distress_cent +
+                               distress_cent:self_norm + distress_cent:self_dist +
+                                 distress_cent:eval +
                                (1 + self_norm + self_dist + distress_cent +
-                                  distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval | 
+                                  distress_cent:self_norm + 
+                                  distress_cent:self_dist + distress_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(accuracy_sam_distress)
+summary(integrated_accuracy_sam_distress)
 ```
 
 #### Empathic Concern moderating Hearsay accuracy
@@ -1916,14 +2007,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + eval + empathic_cent +
-                               empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval +
+```{r integrated_accuracy_x_empathic}
+integrated_accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + eval + empathic_cent +
+                               empathic_cent:self_norm + empathic_cent:self_dist + 
+                                 empathic_cent:eval +
                                (1 + self_norm + self_dist + empathic_cent +
-                                  empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval | 
+                                  empathic_cent:self_norm + 
+                                  empathic_cent:self_dist + empathic_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(accuracy_sam_empathic)
+summary(integrated_accuracy_sam_empathic)
 ```
 
 #### Fantasy moderating Hearsay accuracy
@@ -1945,14 +2038,16 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + eval + fantasy_cent +
-                               fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval +
+```{r integrated_accuracy_x_fantasy}
+integrated_accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + eval + fantasy_cent +
+                               fantasy_cent:self_norm +
+                                 fantasy_cent:self_dist + fantasy_cent:eval +
                                (1 + self_norm + self_dist + fantasy_cent +
-                                  fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval | 
+                                  fantasy_cent:self_norm + 
+                                  fantasy_cent:self_dist + fantasy_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(accuracy_sam_fantasy)
+summary(integrated_accuracy_sam_fantasy)
 ```
 
 #### Perspective Taking moderating Hearsay accuracy
@@ -1974,12 +2069,14 @@ $\beta_{21g} = \gamma_{210} + u_{21g}$
 $\beta_{30g} = \gamma_{300} + u_{30g}$   
 $\beta_{31g} = \gamma_{310} + u_{31g}$
 
-```{r}
-accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + eval + perspective_cent +
-                               perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval +
+```{r integrated_accuracy_x_perspective}
+integrated_accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + eval + perspective_cent +
+                               perspective_cent:self_norm + 
+                                 perspective_cent:self_dist + perspective_cent:eval +
                                (1 + self_norm + self_dist + perspective_cent +
-                                  perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval | 
+                                  perspective_cent:self_norm + 
+                                  perspective_cent:self_dist + perspective_cent:eval | 
                                   sess_id/triad_id),
                              data = integrated_profiles)
-summary(accuracy_sam_perspective)
+summary(integrated_accuracy_sam_perspective)
 ```
