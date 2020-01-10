@@ -1,0 +1,1985 @@
+---
+title: "Profile Analyses (based on JPSP Round 1 reviews)"
+author: "MASKED FOR PEER REVIEW"
+date: "last knitted: `r Sys.time()`"
+output:
+    html_document:
+      toc: true
+      toc_float: true
+      code_folding: show
+      df_print: paged
+---
+# Data & Libraries
+Here I'll read in the data and load the libraries I'll use, including the `ReputationModelR` package I created for these analyses.
+```{r setup, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, cache = TRUE)
+# Make sure necessary packages are installed
+if("rio" %in% installed.packages()[,1] == FALSE){install.packages("rio")}
+if("magrittr" %in% installed.packages()[,1] == FALSE){install.packages("tidyverse")}
+if("ReputationModelR" %in% installed.packages()[,1] == FALSE){devtools::install_github("Coryc3133/ReputationModelR")}
+if("lme4" %in% installed.packages()[,1] == FALSE){install.packages("lme4")}
+if("lmerTest" %in% installed.packages()[,1] == FALSE){install.packages("lmerTest")}
+library(rio)
+library(tidyverse)
+library(ReputationModelR)
+library(lme4)
+library(lmerTest)
+study1 <- import("Data/rep_s1_4ms.csv")
+study2 <- import("Data/rep_s2_4ms.csv") %>% 
+  # missing condition are "", but need to be NA
+  mutate(condition = ifelse(condition == "", NA, condition))
+item_eval <- import("Data/rep_BigSix_evaluativeness.csv")
+```
+
+## Reshape Study 1 Data for Profile Analyses
+
+```{r}
+study1_profiles <- 
+  study1 %>% 
+  select(sess_id, contains("bfi")) %>% 
+  gather(var, rating, -sess_id) %>%
+  separate(var, c("perceiver", "target", "item"), extra = "merge") %>%
+  filter(target == "A" | target == "C") %>% 
+  mutate(triad_id = 
+           case_when(target == "A" ~ "ACD",
+                     target == "C" ~ "CAB"),
+         rating_type = 
+           case_when(perceiver == target ~ "self",
+                     perceiver == "B" ~ "p2",
+                     perceiver == "D" ~ "p2",
+                     TRUE ~ "p1")) %>%
+  select(sess_id, triad_id, item, rating_type, rating) %>% 
+  spread(rating_type, rating) %>% 
+  group_by(item) %>% 
+  mutate(., # center at midpoint
+         p1 = p1 - 3,
+         p2 = p2 -  3,
+         self = self - 3,
+         self_norm = mean(self, na.rm = TRUE),
+         self_dist = self - self_norm,
+         p1_norm = mean(p1, na.rm = TRUE),
+         p1_dist = p1 - p1_norm)
+```
+
+## Reshape Study 2 Data for Profile Analyses
+
+```{r}
+study2_profiles <- 
+  study2 %>% 
+  select(sess_id, contains("bfi")) %>% 
+  gather(var, rating, -sess_id) %>%
+  separate(var, c("perceiver", "target", "item"), extra = "merge") %>%
+  filter(target == "A" | target == "C") %>% 
+  mutate(triad_id = 
+           case_when(target == "A" ~ "ACD",
+                     target == "C" ~ "CAB"),
+         rating_type = 
+           case_when(perceiver == target ~ "self",
+                     perceiver == "B" ~ "p2",
+                     perceiver == "D" ~ "p2",
+                     TRUE ~ "p1")) %>%
+  select(sess_id, triad_id, item, rating_type, rating) %>% 
+  spread(rating_type, rating) %>% 
+  group_by(item) %>% 
+  mutate(., # center at midpoint
+         p1 = p1 - 3,
+         p2 = p2 -  3,
+         self = self - 3,
+         self_norm = mean(self, na.rm = TRUE),
+         self_dist = self - self_norm,
+         p1_norm = mean(p1, na.rm = TRUE),
+         p1_dist = p1 - p1_norm)
+```
+
+## Combining Study 1 and 2 for integrated analyses
+
+```{r}
+integrated_profiles <- 
+  rbind(study1_profiles, study2_profiles)
+```
+
+
+## ICCs and profile for Item Evaluativeness
+### ICC
+```{r}
+item_eval %>% 
+  t() %>% 
+  psych::ICC()
+```
+### Calculating Item Evaluativeness Profile
+```{r}
+item_eval_prof <- item_eval %>% 
+  gather(item, rating, -subj) %>% 
+  # mid-point center it
+  mutate(rating = rating - 3) %>% 
+  group_by(item) %>% 
+  summarize(eval = mean(rating, na.rm = TRUE)) %>% 
+  mutate(item = str_to_lower(item),
+         item = str_replace_all(item, "bfie_", "bfi_"))
+```
+
+#### Joining to other data
+
+```{r}
+# study 1
+study1_profiles <- study1_profiles %>% 
+  left_join(item_eval_prof)
+
+# study 2
+study2_profiles <- study2_profiles %>% 
+  left_join(item_eval_prof)
+
+# integrated
+study2_profiles <- study2_profiles %>% 
+  left_join(item_eval_prof)
+```
+
+##  Calculate Scale Scores
+Here I'll score the BFI into domain scores and the IRI into its subscales. I'll also produce coefficeint alphas and basic descriptives. 
+
+I'm going to use the `scoreItems()` function from the `psych` package. This both reverse scores items and calculates scale scores. It also provide some information about the scores.
+
+### Study 1 Data: Score Big Six Domains
+* agreeableness     = 2, 7, 12R, 17R, 22R, 27, 32, 37R, 42R, 47R, 52, 57
+* conscientiousness = 3R, 8R, 13, 18, 23R, 28R, 33, 38, 43, 48R, 53, 58R
+* hp                = HP45r HP46r HP47r HP48r HP49r HP50 HP51 HP52
+* neuroticism       = 4R, 9R, 14, 19, 24R, 29R, 34, 39, 44R, 49R, 54, 59
+* extraversion      = 1, 6, 11R, 16R, 21, 26R, 31R, 36R, 41, 46, 51R, 56
+* openness          = 5R, 10, 15, 20, 25R, 30R, 35, 40, 45R, 50R, 55R, 60
+
+For now, first make the key:
+```{r make_big6_keys}
+# Make keys
+big6_keys <- list(
+                 agreeableness = c("bfi_2", "bfi_7", "-bfi_12", "-bfi_17", 
+                                   "-bfi_22", "bfi_27", "bfi_32", "-bfi_37", 
+                                   "-bfi_42", "-bfi_47", "bfi_52", "bfi_57"),
+                 conscientiousness = c("-bfi_3", "-bfi_8", "bfi_13", "bfi_18", 
+                                       "-bfi_23", "-bfi_28", "bfi_33", "bfi_38", 
+                                       "bfi_43", "-bfi_48", "bfi_53", "-bfi_58"),
+                 hp = c("-bfi_hp45", "-bfi_hp46", "-bfi_hp47", "-bfi_hp48", 
+                            "-bfi_hp49", "bfi_hp50", "bfi_hp51", "bfi_hp52"),
+                 neuroticism = c("-bfi_4", "-bfi_9", "bfi_14", "bfi_19", 
+                                 "-bfi_24", "-bfi_29", "bfi_34", "bfi_39",
+                                 "-bfi_44", "-bfi_49", "bfi_54", "bfi_59"),
+                 extraversion = c("bfi_1", "bfi_6", "-bfi_11", "-bfi_16", 
+                                  "bfi_21", "-bfi_26", "-bfi_31", "-bfi_36", 
+                                  "bfi_41", "bfi_46", "-bfi_51", "bfi_56"),
+                 openness = c("-bfi_5", "bfi_10", "bfi_15", "bfi_20", 
+                              "-bfi_25", "-bfi_30", "bfi_35", "bfi_40", 
+                              "-bfi_45", "-bfi_50", "-bfi_55", "bfi_60"))
+```
+
+Next, I'll score the Big Six. I'll turn the data into long format to make things a little easier, since it's the same scoring used for all of the Big Six ratings.
+```{r score_big6}
+# Lengthen Data
+study1_big6_long <- 
+study1 %>% 
+  select(sess_id, contains("bfi")) %>% 
+  gather(variable, rating, -sess_id) %>% 
+  separate(variable, 
+           c("perceiver", "target", "item"), 
+           extra = "merge") %>% 
+  spread(item, rating)
+
+# Score long data and bind the scores to
+# the end of the long data, then widen it back out
+# and call it study1, replacing the raw data
+study1 <- 
+  psych::scoreItems(big6_keys, 
+                    items = study1_big6_long, 
+                    impute = "none") %>% 
+  .[["scores"]] %>% 
+  cbind(study1_big6_long, .) %>% 
+  gather(variable, rating, -(1:3)) %>% 
+  unite(variable, perceiver, target, variable) %>% 
+  spread(variable, rating) %>% 
+  select(sess_id,
+         ends_with("agreeableness"),
+         ends_with("conscientiousness"),
+         ends_with("hp"),
+         ends_with("neuroticism"),
+         ends_with("extraversion"),
+         ends_with("openness")) %>% 
+  right_join(study1)
+```
+
+Finally, I'll get the coefficient alphas for each subscale. 
+
+```{r alphas_big6}
+library(kableExtra)
+
+study1_big6_long %>% 
+  mutate(rating_type = case_when(perceiver == target ~ "Self",
+                               perceiver == "A" & target == "C" |
+                                 perceiver == "C" & target == "A" ~ "P1",
+                               perceiver == "B" & target == "C" |
+                                 perceiver == "D" & target == "A" ~ "P2")) %>% 
+  split(.$rating_type) %>% 
+  map_df(~ psych::scoreItems(big6_keys,
+                          items = .,
+                          impute = "none") %>% pluck("alpha")) %>% 
+  mutate(domain = names(big6_keys),
+         domain = ifelse(domain == "hp", "honesty-propriety", domain)) %>% 
+  gather(report, alpha, -domain) %>%
+  mutate(report = fct_relevel(report, 
+                              "Self",
+                              "P1",
+                              "P2")) %>% 
+  select(report, domain, alpha) %>% 
+  arrange(report) %>% 
+  knitr::kable(digits = c(NA, NA, 2),
+               caption = "Coefficient Alphas for Big Six Ratings Study 1",
+               format = "html", escape = F) %>%
+  kable_styling("striped", full_width = F)
+  
+```
+### Study 1 Data: Calculate scale scores: IRI
+
+* Empathic Concern = q2_emp, q4_empr, q9_emp, q14_empr, q18_empr, q20_emp, q22_emp
+
+* Fantasy Scale = q1_fs, q5_fs, q7_fsr, q12_fsr, q16_fs, q23_fs, q26_fs
+
+* Personal Distress = q6_pd, q10_pd, q13_pdr, q17_pd, q19_pdr, q24_pd, q27_pd
+
+* Perspective Taking = q3_ptr, q8_pt, q11_pt, q15_ptr, q21_pt, q25_pt, q28_pt
+
+
+Using the `scoreItems()` function from the psych package again. Then, Ill save out and cbind the scores to the data, and produce a table for the alphas. 
+
+First make the key:
+```{r make_keys_iri}
+iri_keys <- list(
+  iri_empathic = c("q2_emp", "-q4_emp", "q9_emp", "-q14_emp", "-q18_emp", "q20_emp", "q22_emp"),
+  iri_fantasy = c("q1_fs", "q5_fs", "-q7_fs", "-q12_fs", "q16_fs", "q23_fs", "q26_fs"),
+  iri_distress = c("q6_pd", "q10_pd", "-q13_pd", "q17_pd", "-q19_pd", "q24_pd", "q27_pd"),
+  iri_perspective = c("-q3_pt", "q8_pt", "q11_pt", "-q15_pt", "q21_pt", "q25_pt", "q28_pt")
+)
+```
+
+Next, I'll score the IRI. I'll turn the data into long format like above with the Big Six.
+```{r score_iri}
+# Lengthen Data
+study1_iri_long <- 
+study1 %>% 
+  select(sess_id, starts_with("B_q"), starts_with("D_q")) %>% 
+  gather(variable, rating, -sess_id) %>% 
+  separate(variable, 
+           c("perceiver", "item"), 
+           extra = "merge") %>% 
+  spread(item, rating)
+
+# Score long data and bind the scores to
+# the end of the long data, then widen it back out
+# and call it study1, replacing the raw data
+study1 <- 
+  psych::scoreItems(iri_keys, 
+                    items = study1_iri_long, 
+                    impute = "none") %>% 
+  .[["scores"]] %>% 
+  cbind(study1_iri_long, .) %>% 
+  gather(variable, rating, -(1:2)) %>% 
+  unite(variable, perceiver, variable) %>% 
+  spread(variable, rating) %>% 
+  select(sess_id, contains("iri")) %>% 
+  right_join(study1)
+```
+
+Finally, I'll get the coefficient alphas for each subscale. 
+
+```{r alphas_iri}
+library(kableExtra)
+
+ psych::scoreItems(iri_keys, 
+                    items = study1_iri_long, 
+                    impute = "none") %>% 
+  .[["alpha"]] %>% 
+   as_tibble() %>% 
+   gather(subscale, alpha) %>% 
+   mutate(subscale =
+            case_when(subscale == "iri_empathic" ~ "empathic concern",
+                      subscale == "iri_fantasy" ~ "fantasy",
+                      subscale == "iri_distress" ~ "distress tolerance",
+                      subscale == "iri_perspective" ~ "perspective taking")) %>% 
+  knitr::kable(digits = c(NA, 2),
+               caption = "Coefficient Alphas for Perspective Taking Study 1",
+               format = "html", escape = F) %>%
+  kable_styling("striped", full_width = F)
+  
+```
+
+### Study 2 Data: Score Big Six Domains
+Same scoring & keys as Study 2. Basically just the dataframes are different, and the rest is the same.
+```{r score_big6_s2}
+# Lengthen Data
+study2_big6_long <- 
+study2 %>% 
+  select(sess_id, contains("bfi")) %>% 
+  gather(variable, rating, -sess_id) %>% 
+  separate(variable, 
+           c("perceiver", "target", "item"), 
+           extra = "merge") %>% 
+  spread(item, rating)
+
+# Score long data and bind the scores to
+# the end of the long data, then widen it back out
+# and call it study2, replacing the raw data
+study2 <- 
+  psych::scoreItems(big6_keys, 
+                    items = study2_big6_long, 
+                    impute = "none") %>% 
+  .[["scores"]] %>% 
+  cbind(study2_big6_long, .) %>% 
+  gather(variable, rating, -(1:3)) %>% 
+  unite(variable, perceiver, target, variable) %>% 
+  spread(variable, rating) %>% 
+  select(sess_id,
+         ends_with("agreeableness"),
+         ends_with("conscientiousness"),
+         ends_with("hp"),
+         ends_with("neuroticism"),
+         ends_with("extraversion"),
+         ends_with("openness")) %>% 
+  right_join(study2)
+```
+
+Finally, I'll get the coefficient alphas for each subscale. 
+
+```{r alphas_big6_s2}
+library(kableExtra)
+
+study2_big6_long %>% 
+  mutate(rating_type = case_when(perceiver == target ~ "Self",
+                               perceiver == "A" & target == "C" |
+                                 perceiver == "C" & target == "A" ~ "P1",
+                               perceiver == "B" & target == "C" |
+                                 perceiver == "D" & target == "A" ~ "P2")) %>% 
+  split(.$rating_type) %>% 
+  map_df(~ psych::scoreItems(big6_keys,
+                          items = .,
+                          impute = "none") %>% pluck("alpha")) %>% 
+  mutate(domain = names(big6_keys),
+         domain = ifelse(domain == "hp", "honesty-propriety", domain)) %>% 
+  gather(report, alpha, -domain) %>%
+  mutate(report = fct_relevel(report, 
+                              "Self",
+                              "P1",
+                              "P2")) %>% 
+  select(report, domain, alpha) %>% 
+  arrange(report) %>% 
+  knitr::kable(digits = c(NA, NA, 2),
+               caption = "Coefficient Alphas for Big Six Ratings Study 2",
+               format = "html", escape = F) %>%
+  kable_styling("striped", full_width = F)
+  
+```
+
+### Study 2 Data: Calculate scale scores: IRI
+Same keys as before
+
+Next, I'll score the IRI. I'll turn the data into long format like above with the Big Six.
+```{r score_iri_s2}
+# Lengthen Data
+study2_iri_long <- 
+study2 %>% 
+  select(sess_id, starts_with("B_q"), starts_with("D_q")) %>% 
+  gather(variable, rating, -sess_id) %>% 
+  separate(variable, 
+           c("perceiver", "item"), 
+           extra = "merge") %>% 
+  spread(item, rating)
+
+# Score long data and bind the scores to
+# the end of the long data, then widen it back out
+# and call it study2, replacing the raw data
+study2 <- 
+  psych::scoreItems(iri_keys, 
+                    items = study2_iri_long, 
+                    impute = "none") %>% 
+  .[["scores"]] %>% 
+  cbind(study2_iri_long, .) %>% 
+  gather(variable, rating, -(1:2)) %>% 
+  unite(variable, perceiver, variable) %>% 
+  spread(variable, rating) %>% 
+  select(sess_id, contains("iri")) %>% 
+  right_join(study2)
+```
+
+Finally, I'll get the coefficient alphas for each subscale. 
+
+```{r alphas_iri_s2}
+library(kableExtra)
+
+ psych::scoreItems(iri_keys, 
+                    items = study2_iri_long, 
+                    impute = "none") %>% 
+  .[["alpha"]] %>% 
+   as_tibble() %>% 
+   gather(subscale, alpha) %>% 
+   mutate(subscale =
+            case_when(subscale == "iri_empathic" ~ "empathic concern",
+                      subscale == "iri_fantasy" ~ "fantasy",
+                      subscale == "iri_distress" ~ "distress tolerance",
+                      subscale == "iri_perspective" ~ "perspective taking")) %>% 
+  knitr::kable(digits = c(NA, 2),
+               caption = "Coefficient Alphas for Perspective Taking Study 2",
+               format = "html", escape = F) %>%
+  kable_styling("striped", full_width = F)
+  
+```
+
+
+# Study 1 Hearsay SAM
+## Self-P1 & Self-P2 in same model
+
+### Level 1 Equation:
+$P_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distance_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distance_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distance_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distance_{tg} + r_{2tg}$    
+
+### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+study1_profiles2 <- study1_profiles %>% 
+  select(sess_id, triad_id, item, self_norm, self_dist, eval, p1, p2) %>% 
+  gather(distance, rating, -(sess_id:eval))
+
+accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + eval + distance +
+                               distance:self_norm + distance:self_dist + distance:eval +
+                               (1 + self_norm + self_dist + distance +
+                                  distance:self_norm + distance:self_dist + distance:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles2)
+summary(accuracy_sam_combined)
+```
+
+## P1-P2 Agreement 
+
+### Level 1 Equation:
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + r_{3tg}$
+
+### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$  
+$\beta_{30g} = \gamma_{300} + u_{30g}$  
+
+*i* = item; *t* = triad; *g* = group
+```{r}
+consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + eval +
+                         (1 + p1_norm + p1_dist + eval | sess_id/triad_id),
+                       data = study1_profiles)
+
+summary(consensus_sam)
+```
+
+## Extraversion Moderators
+
+### adding target, P1, and P2 Extraversion to profile data
+
+```{r}
+# joining in target Extraversion
+study1_profiles <- study1 %>% 
+  select(sess_id, ends_with("extraversion")) %>% 
+  gather(var, t_ext, -sess_id) %>% 
+  separate(var, c("perceiver", "target", "variable")) %>%
+  filter(perceiver == target & perceiver == "A" | 
+         perceiver == target & perceiver == "C") %>%
+  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
+  mutate(t_ext_cent = t_ext - mean(t_ext, na.rm = TRUE)) %>% 
+  select(sess_id, triad_id, t_ext_cent) %>% 
+  right_join(study1_profiles)
+
+# joining in P1 Extraversion
+study1_profiles <- study1 %>% 
+  select(sess_id, ends_with("extraversion")) %>% 
+  gather(var, p1_ext, -sess_id) %>% 
+  separate(var, c("perceiver", "target", "variable")) %>%
+  filter(perceiver == "A" & target == "C" | 
+         perceiver == "C" & target == "A") %>%
+  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
+  mutate(p1_ext_cent = p1_ext - mean(p1_ext, na.rm = TRUE)) %>% 
+  select(sess_id, triad_id, p1_ext_cent) %>% 
+  right_join(study1_profiles)
+
+# joining in P2 Extraversion
+
+study1_profiles <- study1 %>% 
+  select(sess_id, ends_with("extraversion")) %>% 
+  gather(var, p2_ext, -sess_id) %>% 
+  separate(var, c("perceiver", "target", "variable")) %>%
+  filter(perceiver == "B" & target == "C" | 
+         perceiver == "D" & target == "A") %>%
+  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
+  mutate(p2_ext_cent = p2_ext - mean(p2_ext, na.rm = TRUE)) %>% 
+  select(sess_id, triad_id, p2_ext_cent) %>% 
+  right_join(study1_profiles)
+```
+
+### Extraversion Moderating Hearsay Consensus
+#### Target Extraversion moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + t_ext_cent +
+                               t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval +
+                               (1 + p1_norm + p1_dist + t_ext_cent +
+                                  t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(consensus_sam_t_ext)
+```
+
+#### P1 Extraversion moderating Hearsay Consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p1_ext_cent +
+                               p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval +
+                               (1 + p1_norm + p1_dist + p1_ext_cent +
+                                  p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(consensus_sam_p1_ext)
+```
+
+#### P2 Extraversion moderating Hearsay Consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p2_ext_cent +
+                               p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval +
+                               (1 + p1_norm + p1_dist + p2_ext_cent +
+                                  p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(consensus_sam_p2_ext)
+```
+
+### Extraversion Moderating Hearsay Accuracy
+#### Target Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + eval + t_ext_cent +
+                               t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval +
+                               (1 + self_norm + self_dist + t_ext_cent +
+                                  t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(accuracy_sam_t_ext)
+```
+
+#### P1 Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + eval + p1_ext_cent +
+                               p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval +
+                               (1 + self_norm + self_dist + p1_ext_cent +
+                                  p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(accuracy_sam_p1_ext)
+```
+
+#### P2 Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + eval + p2_ext_cent +
+                               p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval +
+                               (1 + self_norm + self_dist + p2_ext_cent +
+                                  p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(accuracy_sam_p2_ext)
+```
+
+## Empathy Moderators
+
+### adding P2 Empathy to profile data
+
+```{r}
+# joining in P2 Empathy
+study1_profiles <- study1 %>% 
+  select(sess_id, B_iri_distress, B_iri_empathic, B_iri_fantasy, B_iri_perspective,
+         D_iri_distress, D_iri_empathic, D_iri_fantasy, D_iri_perspective) %>% 
+  gather(var, value, -sess_id) %>% 
+  separate(var, c("p2", "elim", "variable")) %>%
+  mutate(triad_id = ifelse(p2 == "B", "CAB", "ACD")) %>%
+  spread(variable, value) %>% 
+  mutate(distress_cent = distress - mean(distress, na.rm = TRUE),
+         empathic_cent = empathic - mean(empathic, na.rm = TRUE),
+         fantasy_cent = fantasy - mean(fantasy, na.rm = TRUE),
+         perspective_cent = perspective - mean(perspective, na.rm = TRUE))%>% 
+  select(sess_id, triad_id, distress_cent, empathic_cent,
+         fantasy_cent, perspective_cent) %>% 
+  right_join(study1_profiles)
+```
+
+### Empathy Moderating Consensus
+#### Distress moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + eval + distress_cent +
+                               distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval +
+                               (1 + p1_norm + p1_dist + distress_cent +
+                                  distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(consensus_sam_distress)
+```
+
+#### Empathic Concern moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + eval + empathic_cent +
+                               empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval +
+                               (1 + p1_norm + p1_dist + empathic_cent +
+                                  empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(consensus_sam_empathic)
+```
+
+#### Fantasy moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + eval + fantasy_cent +
+                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval +
+                               (1 + p1_norm + p1_dist + fantasy_cent +
+                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(consensus_sam_fantasy)
+```
+
+### Perspective Taking moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + eval + perspective_cent +
+                               perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval +
+                               (1 + p1_norm + p1_dist + perspective_cent +
+                                  perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(consensus_sam_perspective)
+```
+
+### Empathy Moderating Accuracy
+#### Distress moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + eval + distress_cent +
+                               distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval +
+                               (1 + self_norm + self_dist + distress_cent +
+                                  distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(accuracy_sam_distress)
+```
+
+#### Empathic Concern moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + eval + empathic_cent +
+                               empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval +
+                               (1 + self_norm + self_dist + empathic_cent +
+                                  empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(accuracy_sam_empathic)
+```
+
+#### Fantasy moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + eval + fantasy_cent +
+                               fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval +
+                               (1 + self_norm + self_dist + fantasy_cent +
+                                  fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(accuracy_sam_fantasy)
+```
+
+#### Perspective Taking moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + eval + perspective_cent +
+                               perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval +
+                               (1 + self_norm + self_dist + perspective_cent +
+                                  perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study1_profiles)
+summary(accuracy_sam_perspective)
+```
+
+# Study 2 Hearsay SAM
+## Self-P1 & Self-P2 in same model
+
+### Level 1 Equation:
+$P_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distance_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distance_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distance_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distance_{tg} + r_{2tg}$    
+
+### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+study2_profiles2 <- study2_profiles %>% 
+  select(sess_id, triad_id, item, self_norm, self_dist, eval, p1, p2) %>% 
+  gather(distance, rating, -(sess_id:eval))
+
+accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + eval + distance +
+                               distance:self_norm + distance:self_dist + distance:eval +
+                               (1 + self_norm + self_dist + distance +
+                                  distance:self_norm + distance:self_dist + distance:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles2)
+summary(accuracy_sam_combined)
+```
+
+## P1-P2 Agreement 
+
+### Level 1 Equation:
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + r_{3tg}$
+
+### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$  
+$\beta_{30g} = \gamma_{300} + u_{30g}$  
+
+*i* = item; *t* = triad; *g* = group
+```{r}
+consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + eval +
+                         (1 + p1_norm + p1_dist + eval | sess_id/triad_id),
+                       data = study2_profiles)
+
+summary(consensus_sam)
+```
+
+## Extraversion Moderators
+
+### adding target, P1, and P2 Extraversion to profile data
+
+```{r}
+# joining in target Extraversion
+study2_profiles <- study2 %>% 
+  select(sess_id, ends_with("extraversion")) %>% 
+  gather(var, t_ext, -sess_id) %>% 
+  separate(var, c("perceiver", "target", "variable")) %>%
+  filter(perceiver == target & perceiver == "A" | 
+         perceiver == target & perceiver == "C") %>%
+  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
+  mutate(t_ext_cent = t_ext - mean(t_ext, na.rm = TRUE)) %>% 
+  select(sess_id, triad_id, t_ext_cent) %>% 
+  right_join(study2_profiles)
+
+# joining in P1 Extraversion
+study2_profiles <- study2 %>% 
+  select(sess_id, ends_with("extraversion")) %>% 
+  gather(var, p1_ext, -sess_id) %>% 
+  separate(var, c("perceiver", "target", "variable")) %>%
+  filter(perceiver == "A" & target == "C" | 
+         perceiver == "C" & target == "A") %>%
+  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
+  mutate(p1_ext_cent = p1_ext - mean(p1_ext, na.rm = TRUE)) %>% 
+  select(sess_id, triad_id, p1_ext_cent) %>% 
+  right_join(study2_profiles)
+
+# joining in P2 Extraversion
+
+study2_profiles <- study2 %>% 
+  select(sess_id, ends_with("extraversion")) %>% 
+  gather(var, p2_ext, -sess_id) %>% 
+  separate(var, c("perceiver", "target", "variable")) %>%
+  filter(perceiver == "B" & target == "C" | 
+         perceiver == "D" & target == "A") %>%
+  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
+  mutate(p2_ext_cent = p2_ext - mean(p2_ext, na.rm = TRUE)) %>% 
+  select(sess_id, triad_id, p2_ext_cent) %>% 
+  right_join(study2_profiles)
+```
+
+### Extraversion Moderating Hearsay Consensus
+#### Target Extraversion moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + t_ext_cent +
+                               t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval +
+                               (1 + p1_norm + p1_dist + t_ext_cent +
+                                  t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(consensus_sam_t_ext)
+```
+
+#### P1 Extraversion moderating Hearsay Consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p1_ext_cent +
+                               p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval +
+                               (1 + p1_norm + p1_dist + p1_ext_cent +
+                                  p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(consensus_sam_p1_ext)
+```
+
+#### P2 Extraversion moderating Hearsay Consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p2_ext_cent +
+                               p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval +
+                               (1 + p1_norm + p1_dist + p2_ext_cent +
+                                  p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(consensus_sam_p2_ext)
+```
+
+### Extraversion Moderating Hearsay Accuracy
+#### Target Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + eval + t_ext_cent +
+                               t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval +
+                               (1 + self_norm + self_dist + t_ext_cent +
+                                  t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(accuracy_sam_t_ext)
+```
+
+#### P1 Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + eval + p1_ext_cent +
+                               p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval +
+                               (1 + self_norm + self_dist + p1_ext_cent +
+                                  p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(accuracy_sam_p1_ext)
+```
+
+#### P2 Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + eval + p2_ext_cent +
+                               p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval +
+                               (1 + self_norm + self_dist + p2_ext_cent +
+                                  p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(accuracy_sam_p2_ext)
+```
+
+## Empathy Moderators
+
+### adding P2 Empathy to profile data
+
+```{r}
+# joining in P2 Empathy
+study2_profiles <- study2 %>% 
+  select(sess_id, B_iri_distress, B_iri_empathic, B_iri_fantasy, B_iri_perspective,
+         D_iri_distress, D_iri_empathic, D_iri_fantasy, D_iri_perspective) %>% 
+  gather(var, value, -sess_id) %>% 
+  separate(var, c("p2", "elim", "variable")) %>%
+  mutate(triad_id = ifelse(p2 == "B", "CAB", "ACD")) %>%
+  spread(variable, value) %>% 
+  mutate(distress_cent = distress - mean(distress, na.rm = TRUE),
+         empathic_cent = empathic - mean(empathic, na.rm = TRUE),
+         fantasy_cent = fantasy - mean(fantasy, na.rm = TRUE),
+         perspective_cent = perspective - mean(perspective, na.rm = TRUE))%>% 
+  select(sess_id, triad_id, distress_cent, empathic_cent,
+         fantasy_cent, perspective_cent) %>% 
+  right_join(study2_profiles)
+```
+
+### Empathy Moderating Consensus
+#### Distress moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + eval + distress_cent +
+                               distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval +
+                               (1 + p1_norm + p1_dist + distress_cent +
+                                  distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(consensus_sam_distress)
+```
+
+#### Empathic Concern moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + eval + empathic_cent +
+                               empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval +
+                               (1 + p1_norm + p1_dist + empathic_cent +
+                                  empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(consensus_sam_empathic)
+```
+
+#### Fantasy moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + eval + fantasy_cent +
+                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval +
+                               (1 + p1_norm + p1_dist + fantasy_cent +
+                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(consensus_sam_fantasy)
+```
+
+### Perspective Taking moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + eval + perspective_cent +
+                               perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval +
+                               (1 + p1_norm + p1_dist + perspective_cent +
+                                  perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(consensus_sam_perspective)
+```
+
+### Empathy Moderating Accuracy
+#### Distress moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + eval + distress_cent +
+                               distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval +
+                               (1 + self_norm + self_dist + distress_cent +
+                                  distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(accuracy_sam_distress)
+```
+
+#### Empathic Concern moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + eval + empathic_cent +
+                               empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval +
+                               (1 + self_norm + self_dist + empathic_cent +
+                                  empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(accuracy_sam_empathic)
+```
+
+#### Fantasy moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + eval + fantasy_cent +
+                               fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval +
+                               (1 + self_norm + self_dist + fantasy_cent +
+                                  fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(accuracy_sam_fantasy)
+```
+
+#### Perspective Taking moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + eval + perspective_cent +
+                               perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval +
+                               (1 + self_norm + self_dist + perspective_cent +
+                                  perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval | 
+                                  sess_id/triad_id),
+                             data = study2_profiles)
+summary(accuracy_sam_perspective)
+```
+# Integrated Hearsay SAM
+## Combine Data
+```{r}
+integrated_profiles <- rbind(study1_profiles,
+                             study2_profiles)
+```
+
+## Self-P1 & Self-P2 in same model
+
+### Level 1 Equation:
+$P_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distance_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distance_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distance_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distance_{tg} + r_{2tg}$    
+
+### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+integrated_profiles2 <- integrated_profiles %>% 
+  select(sess_id, triad_id, item, self_norm, self_dist, eval, p1, p2) %>% 
+  gather(distance, rating, -(sess_id:eval))
+
+accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + eval + distance +
+                               distance:self_norm + distance:self_dist + distance:eval +
+                               (1 + self_norm + self_dist + distance +
+                                  distance:self_norm + distance:self_dist + distance:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles2)
+summary(accuracy_sam_combined)
+```
+
+## P1-P2 Agreement 
+
+### Level 1 Equation:
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + r_{3tg}$
+
+### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$  
+$\beta_{30g} = \gamma_{300} + u_{30g}$  
+
+*i* = item; *t* = triad; *g* = group
+```{r}
+consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + eval +
+                         (1 + p1_norm + p1_dist + eval | sess_id/triad_id),
+                       data = integrated_profiles)
+
+summary(consensus_sam)
+```
+
+## Extraversion Moderators
+
+### Extraversion Moderating Hearsay Consensus
+#### Target Extraversion moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + t_ext_cent +
+                               t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval +
+                               (1 + p1_norm + p1_dist + t_ext_cent +
+                                  t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(consensus_sam_t_ext)
+```
+
+#### P1 Extraversion moderating Hearsay Consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p1_ext_cent +
+                               p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval +
+                               (1 + p1_norm + p1_dist + p1_ext_cent +
+                                  p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(consensus_sam_p1_ext)
+```
+
+#### P2 Extraversion moderating Hearsay Consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + eval + p2_ext_cent +
+                               p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval +
+                               (1 + p1_norm + p1_dist + p2_ext_cent +
+                                  p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(consensus_sam_p2_ext)
+```
+
+### Extraversion Moderating Hearsay Accuracy
+#### Target Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + eval + t_ext_cent +
+                               t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval +
+                               (1 + self_norm + self_dist + t_ext_cent +
+                                  t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(accuracy_sam_t_ext)
+```
+
+#### P1 Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + eval + p1_ext_cent +
+                               p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval +
+                               (1 + self_norm + self_dist + p1_ext_cent +
+                                  p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(accuracy_sam_p1_ext)
+```
+
+#### P2 Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + eval + p2_ext_cent +
+                               p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval +
+                               (1 + self_norm + self_dist + p2_ext_cent +
+                                  p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(accuracy_sam_p2_ext)
+```
+
+## Empathy Moderators
+
+### Empathy Moderating Consensus
+#### Distress moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + eval + distress_cent +
+                               distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval +
+                               (1 + p1_norm + p1_dist + distress_cent +
+                                  distress_cent:p1_norm + distress_cent:p1_dist + distress_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(consensus_sam_distress)
+```
+
+#### Empathic Concern moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + eval + empathic_cent +
+                               empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval +
+                               (1 + p1_norm + p1_dist + empathic_cent +
+                                  empathic_cent:p1_norm + empathic_cent:p1_dist + empathic_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(consensus_sam_empathic)
+```
+
+#### Fantasy moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + eval + fantasy_cent +
+                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval +
+                               (1 + p1_norm + p1_dist + fantasy_cent +
+                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + fantasy_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(consensus_sam_fantasy)
+```
+
+### Perspective Taking moderating Hearsay consensus
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveP1_{it} + \pi_{2tg}NormativeP1_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + eval + perspective_cent +
+                               perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval +
+                               (1 + p1_norm + p1_dist + perspective_cent +
+                                  perspective_cent:p1_norm + perspective_cent:p1_dist + perspective_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(consensus_sam_perspective)
+```
+
+### Empathy Moderating Accuracy
+#### Distress moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + eval + distress_cent +
+                               distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval +
+                               (1 + self_norm + self_dist + distress_cent +
+                                  distress_cent:self_norm + distress_cent:self_dist + distress_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(accuracy_sam_distress)
+```
+
+#### Empathic Concern moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + eval + empathic_cent +
+                               empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval +
+                               (1 + self_norm + self_dist + empathic_cent +
+                                  empathic_cent:self_norm + empathic_cent:self_dist + empathic_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(accuracy_sam_empathic)
+```
+
+#### Fantasy moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + eval + fantasy_cent +
+                               fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval +
+                               (1 + self_norm + self_dist + fantasy_cent +
+                                  fantasy_cent:self_norm + fantasy_cent:self_dist + fantasy_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(accuracy_sam_fantasy)
+```
+
+#### Perspective Taking moderating Hearsay accuracy
+$P2_{itg} = \pi_{0tg} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{2tg}NormativeSelf_{i} + \pi_{3tg}EvaluativenessProfile_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r}
+accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + eval + perspective_cent +
+                               perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval +
+                               (1 + self_norm + self_dist + perspective_cent +
+                                  perspective_cent:self_norm + perspective_cent:self_dist + perspective_cent:eval | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(accuracy_sam_perspective)
+```

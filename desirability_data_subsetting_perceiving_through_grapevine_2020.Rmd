@@ -1,0 +1,19 @@
+---
+title: "Read & write out Big Six Evaluativeness Data (for posting)"
+author: "Cory Costello"
+date: "last knitted: `r Sys.time()`"
+output: html_document
+---
+
+```{r}
+library(rio)
+library(tidyverse)
+library(lme4)
+import("../../Data/Big Six Desirability Ratings_January 8, 2020_18.51.csv") %>% 
+  slice(-(1:2)) %>% 
+  select(starts_with("BFI")) %>% 
+  mutate_all(as.numeric) %>%
+  mutate(subj = row.names(.)) %>% 
+  export("./Data/rep_BigSix_evaluativeness.csv")
+```
+

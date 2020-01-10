@@ -1,0 +1,32 @@
+---
+title: "ICC for BFI desirability"
+author: "Cory Costello"
+date: "last knitted: `r Sys.time()`"
+output: html_document
+---
+
+```{r}
+library(rio)
+library(tidyverse)
+library(lme4)
+df <- import("Data/rep_BigSix_evaluativeness.csv")
+```
+
+# In MLM
+```{r}
+df %>% 
+  gather(item, rating, -subj) %>% 
+  lmer(rating ~ (1 | item) + (1 | subj), data = .) %>% 
+  broom::tidy(effects = "ran_pars", scales = "vcov") %>% 
+  mutate(icc = estimate / sum(estimate)) %>% 
+  select(group, icc)
+
+```
+
+# In Psych ICC (gives ICC for average)
+```{r}
+df %>% 
+  t() %>% 
+  psych::ICC()
+```
+
