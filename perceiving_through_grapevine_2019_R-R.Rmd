@@ -473,13 +473,13 @@ fixed_coefs_tbl <- function(model){
   mutate(std_est = c(0, lm_beta_lmer(model)),
          p = ifelse(p > .001, round(p, 3), "<.001"),
          component = case_when(
-           term == "(Intercept)" ~ "-",
+           term == "(Intercept)" ~ "intercept",
            term == "self_norm" ~ "Normative Accuracy",
            term == "self_dist" ~ "Distinctive Accuracy",
            term == "p1_norm" ~ "Normative Consensus",
            term == "p1_dist" ~ "Distinctive Consensus",
            term == "pos" ~ "Positivity Bias", 
-           term == "distancep2" ~ "-", 
+           term == "distancep2" ~ "Distance (P1 vs. P2)", 
            term == "self_norm:distancep2" ~ "Distance X Normative Accuracy",
            term == "self_dist:distancep2" ~ "Distance X Distinctive Accuracy",
            term == "pos:distancep2" ~ "Distance X Positivity Bias", 
@@ -619,12 +619,109 @@ fixed_coefs_tbl <- function(model){
 
 ```
 
+```{r Ran_fx_tbl_funs, cache = FALSE}
+
+random_coefs_tbl <- function(model){
+  model %>% 
+  broom.mixed::tidy(effects = "ran_pars", scales = "vcov") %>% 
+  transmute(
+    source = group,
+    term = term,
+    est = estimate) %>% 
+  separate(term, c("type", "term"), extra = "merge") %>% 
+  mutate(type = str_replace_all(type, c(
+           "var" = "variance",
+           "cov" = "covariance")),
+         source = str_replace_all(source, c(
+           "triad_id" = "triad",
+           "sess_id" = "group")),
+         term = str_replace_all(term, c(
+           #"(Intercept)" = "intercept",
+           "self_norm" = "Normative Accuracy",
+           "self_dist" = "Distinctive Accuracy",
+           "p1_norm" = "Normative Consensus",
+           "p1_dist" = "Distinctive Consensus",
+           "pos" = "Positivity Bias", 
+           "self_norm:distancep2" = "Distance X Normative Accuracy",
+           "self_dist:distancep2" = "Distance X Distinctive Accuracy",
+           "pos:distancep2" = "Distance X Positivity Bias", 
+           # extraversion moderators
+           "t_ext_cent" = "Target Extraversion",
+           "p1_norm:t_ext_cent" = "Target Extraversion X Normative Consensus",
+           "p1_dist:t_ext_cent" = "Target Extraversion X Distinctive Consensus",
+           "pos:t_ext_cent" = "Target Extraversion X Positivity Bias",
+           "t_ext_cent" = "Target Extraversion",
+           "self_norm:t_ext_cent" = "Target Extraversion X Normative Accuracy",
+           "self_dist:t_ext_cent" = "Target Extraversion X Distinctive Accuracy",
+           "pos:t_ext_cent" = "Target Extraversion X Positivity Bias",
+           "p1_ext_cent" = "P1 Extraversion",
+           "p1_norm:p1_ext_cent" = "P1 Extraversion X Normative Consensus",
+           "p1_dist:p1_ext_cent" = "P1 Extraversion X Distinctive Consensus",
+           "pos:p1_ext_cent" = "P1 Extraversion X Positivity Bias",
+           "p1_ext_cent" = "P1 Extraversion",
+           "self_norm:p1_ext_cent" = "P1 Extraversion X Normative Accuracy",
+           "self_dist:p1_ext_cent" = "P1 Extraversion X Distinctive Accuracy",
+           "pos:p1_ext_cent" = "P1 Extraversion X Positivity Bias",
+           "p2_ext_cent" = "P2 Extraversion",
+           "p1_norm:p2_ext_cent" = "P2 Extraversion X Normative Consensus",
+           "p1_dist:p2_ext_cent" = "P2 Extraversion X Distinctive Consensus",
+           "pos:p2_ext_cent" = "P2 Extraversion X Positivity Bias",
+           "p2_ext_cent" = "P2 Extraversion",
+           "self_norm:p2_ext_cent" = "P2 Extraversion X Normative Accuracy",
+           "self_dist:p2_ext_cent" = "P2 Extraversion X Distinctive Accuracy",
+           "pos:p2_ext_cent" = "P2 Extraversion X Positivity Bias",
+           # empathy moderators
+           "distress_cent" = "P2 Distress",
+           "p1_norm:distress_cent" = "P2 Distress X Normative Consensus",
+           "p1_dist:distress_cent" = "P2 Distress X Distinctive Consensus",
+           "pos:distress_cent" = "P2 Distress X Positivity Bias",
+           "distress_cent" = "P2 Distress",
+           "self_norm:distress_cent" = "P2 Distress X Normative Accuracy",
+           "self_dist:distress_cent" = "P2 Distress X Distinctive Accuracy",
+           "pos:distress_cent" = "P2 Distress X Positivity Bias",
+           "fantasy_cent" = "P2 Fantasy",
+           "p1_norm:fantasy_cent" = "P2 Fantasy X Normative Consensus",
+           "p1_dist:fantasy_cent" = "P2 Fantasy X Distinctive Consensus",
+           "pos:fantasy_cent" = "P2 Fantasy X Positivity Bias",
+           "fantasy_cent" = "P2 Fantasy",
+           "self_norm:fantasy_cent" = "P2 Fantasy X Normative Accuracy",
+           "self_dist:fantasy_cent" = "P2 Fantasy X Distinctive Accuracy",
+           "pos:fantasy_cent" = "P2 Fantasy X Positivity Bias",
+           "empathic_cent" = "P2 Empathic Concern",
+           "p1_norm:empathic_cent" = "P2 Empathic Concern X Normative Consensus",
+           "p1_dist:empathic_cent" = "P2 Empathic Concern X Distinctive Consensus",
+           "pos:empathic_cent" = "P2 Empathic Concern X Positivity Bias",
+           "empathic_cent" = "P2 Empathic Concern",
+           "self_norm:empathic_cent" = "P2 Empathic Concern X Normative Accuracy",
+           "self_dist:empathic_cent" = "P2 Empathic Concern X Distinctive Accuracy",
+           "pos:empathic_cent" = "P2 Empathic Concern X Positivity Bias",
+           "perspective_cent" = "P2 Perspective Taking",
+           "p1_norm:perspective_cent" = "P2 Perspective Taking X Normative Consensus",
+           "p1_dist:perspective_cent" = "P2 Perspective Taking X Distinctive Consensus",
+           "pos:perspective_cent" = "P2 Perspective Taking X Positivity Bias",
+           "perspective_cent" = "P2 Perspective Taking",
+           "self_norm:perspective_cent" = "P2 Perspective Taking X Normative Accuracy",
+           "self_dist:perspective_cent" = "P2 Perspective Taking X Distinctive Accuracy",
+           "pos:perspective_cent" = "P2 Perspective Taking X Positivity Bias",
+           "\\." = ", ",
+           "distancep2" = "distance (p1 vs. p2)",
+           "\\:" = " X "))) %>% 
+  knitr::kable(style = "html",
+               digits = c(NA, NA, NA, 2)) %>% 
+  kableExtra::kable_styling("striped", full_width = F)
+}
+```
+
+
 ```{r study1_p1p2_consensus_sam_tbl, cache = FALSE}
 study1_consensus_sam %>% 
   fixed_coefs_tbl()
 ```
 
-
+```{r study1_p1p2_consensus_sam_rfx_tbl, cache = FALSE}
+study1_consensus_sam %>% 
+  random_coefs_tbl()
+```
 
 ## Self-P1 & Self-P2 in same model
 
@@ -666,6 +763,10 @@ study1_accuracy_sam_combined %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_accuracy_sam_rfx_tbl, cache = FALSE}
+study1_accuracy_sam_combined %>% 
+  random_coefs_tbl()
+```
 
 ### Simple Slope for p2
 
@@ -681,6 +782,11 @@ summary(study1_accuracy_simple_sam_p2)
 ```{r study1_p2_simple_tbl, cache = FALSE}
 study1_accuracy_simple_sam_p2 %>% 
   fixed_coefs_tbl()
+```
+
+```{r study1_p2_simple_rfx_tbl, cache = FALSE}
+study1_accuracy_simple_sam_p2 %>% 
+  random_coefs_tbl()
 ```
 
 ## Extraversion Moderators
@@ -767,6 +873,11 @@ study1_consensus_sam_t_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_consensus_sam_t_ext_rfx_tbl, cache = FALSE}
+study1_consensus_sam_t_ext %>% 
+  random_coefs_tbl()
+```
+
 
 #### P1 Extraversion moderating Hearsay Consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
@@ -806,6 +917,10 @@ study1_consensus_sam_p1_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_consensus_sam_p1_ext_rfx_tbl, cache = FALSE}
+study1_consensus_sam_p1_ext %>% 
+  random_coefs_tbl()
+```
 
 #### P2 Extraversion moderating Hearsay Consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
@@ -843,6 +958,10 @@ study1_consensus_sam_p2_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_consensus_sam_p2_ext_rfx_tbl, cache = FALSE}
+study1_consensus_sam_p2_ext %>% 
+  random_coefs_tbl()
+```
 
 ### Extraversion Moderating Hearsay Accuracy
 #### Target Extraversion moderating Hearsay Accuracy
@@ -879,6 +998,10 @@ study1_accuracy_sam_t_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_accuracy_sam_t_ext_rfx_tbl, cache = FALSE}
+study1_accuracy_sam_t_ext %>% 
+  random_coefs_tbl()
+```
 
 #### P1 Extraversion moderating Hearsay Accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
@@ -914,6 +1037,10 @@ study1_accuracy_sam_p1_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_accuracy_sam_p1_ext_rfx_tbl, cache = FALSE}
+study1_accuracy_sam_p1_ext %>% 
+  random_coefs_tbl()
+```
 
 #### P2 Extraversion moderating Hearsay Accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
@@ -950,6 +1077,10 @@ study1_accuracy_sam_p2_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_accuracy_sam_p2_ext_rfx_tbl, cache = FALSE}
+study1_accuracy_sam_p2_ext %>% 
+  random_coefs_tbl()
+```
 
 ## Empathy Moderators
 
@@ -1046,6 +1177,11 @@ study1_consensus_sam_empathic %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_consensus_sam_empathic_rfx_tbl, cache = FALSE}
+study1_consensus_sam_empathic %>% 
+  random_coefs_tbl()
+```
+
 #### Fantasy moderating Hearsay consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -1082,6 +1218,11 @@ study1_consensus_sam_fantasy %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_consensus_sam_fantasy_rfx_tbl, cache = FALSE}
+study1_consensus_sam_fantasy %>% 
+  random_coefs_tbl()
+```
+
 ### Perspective Taking moderating Hearsay consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -1116,6 +1257,11 @@ summary(study1_consensus_sam_perspective)
 ```{r study1_consensus_sam_perspective_tbl, cache = FALSE}
 study1_consensus_sam_perspective %>% 
   fixed_coefs_tbl()
+```
+
+```{r study1_consensus_sam_perspective_rfx_tbl, cache = FALSE}
+study1_consensus_sam_perspective %>% 
+  random_coefs_tbl()
 ```
 
 ### Empathy Moderating Accuracy
@@ -1155,6 +1301,11 @@ study1_accuracy_sam_distress %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_accuracy_sam_distress_rfx_tbl, cache = FALSE}
+study1_accuracy_sam_distress %>% 
+  random_coefs_tbl()
+```
+
 #### Empathic Concern moderating Hearsay accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -1189,6 +1340,11 @@ summary(study1_accuracy_sam_empathic)
 ```{r study1_accuracy_sam_empathic_tbl, cache = FALSE}
 study1_accuracy_sam_empathic %>% 
   fixed_coefs_tbl()
+```
+
+```{r study1_accuracy_sam_empathic_rfx_tbl, cache = FALSE}
+study1_accuracy_sam_empathic %>% 
+  random_coefs_tbl()
 ```
 
 #### Fantasy moderating Hearsay accuracy
@@ -1227,6 +1383,12 @@ study1_accuracy_sam_fantasy %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_accuracy_sam_fantasy_rfx_tbl, cache = FALSE}
+study1_accuracy_sam_fantasy %>% 
+  random_coefs_tbl()
+```
+
+
 #### Perspective Taking moderating Hearsay accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -1263,6 +1425,12 @@ study1_accuracy_sam_perspective %>%
   fixed_coefs_tbl()
 ```
 
+```{r study1_accuracy_sam_perspective_rfx_tbl, cache = FALSE}
+study1_accuracy_sam_perspective %>% 
+  random_coefs_tbl()
+```
+
+
 # Study 2 Hearsay SAM
 ## P1-P2 Agreement 
 
@@ -1295,6 +1463,10 @@ study2_consensus_sam %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_p1p2_consensus_sam_rfx_tbl, cache = FALSE}
+study2_consensus_sam %>% 
+  random_coefs_tbl()
+```
 
 ## Self-P1 & Self-P2 in same model
 
@@ -1336,6 +1508,11 @@ study2_accuracy_sam_combined %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_accuracy_sam_rfx_tbl, cache = FALSE}
+study2_accuracy_sam_combined %>% 
+  random_coefs_tbl()
+```
+
 ### Simple Slope for p2
 
 ```{r study2_simple_accuracy_p2}
@@ -1350,6 +1527,11 @@ summary(study2_accuracy_simple_sam_p2)
 ```{r study2_simple_accuracy_p2_tbl, cache = FALSE}
 study2_accuracy_simple_sam_p2 %>% 
   fixed_coefs_tbl()
+```
+
+```{r study2_simple_accuracy_p2_rfx_tbl, cache = FALSE}
+study2_accuracy_simple_sam_p2 %>% 
+  random_coefs_tbl()
 ```
 
 ## Extraversion Moderators
@@ -1430,6 +1612,10 @@ study2_consensus_sam_t_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_consensus_sam_t_ext_rfx_tbl, cache = FALSE}
+study2_consensus_sam_t_ext %>% 
+  random_coefs_tbl()
+```
 
 #### P1 Extraversion moderating Hearsay Consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
@@ -1463,6 +1649,11 @@ summary(study2_consensus_sam_p1_ext)
 ```{r study2_consensus_sam_p1_ext_tbl, cache = FALSE}
 study2_consensus_sam_p1_ext %>% 
   fixed_coefs_tbl()
+```
+
+```{r study2_consensus_sam_p1_ext_rfx_tbl, cache = FALSE}
+study2_consensus_sam_p1_ext %>% 
+  random_coefs_tbl()
 ```
 
 #### P2 Extraversion moderating Hearsay Consensus
@@ -1499,6 +1690,10 @@ study2_consensus_sam_p2_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_consensus_sam_p2_ext_rfx_tbl, cache = FALSE}
+study2_consensus_sam_p2_ext %>% 
+  random_coefs_tbl()
+```
 
 ### Extraversion Moderating Hearsay Accuracy
 #### Target Extraversion moderating Hearsay Accuracy
@@ -1535,6 +1730,11 @@ study2_accuracy_sam_t_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_accuracy_sam_t_ext_rfx_tbl, cache = FALSE}
+study2_accuracy_sam_t_ext %>% 
+  random_coefs_tbl()
+```
+
 #### P1 Extraversion moderating Hearsay Accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -1567,6 +1767,11 @@ summary(study2_accuracy_sam_p1_ext)
 ```{r study2_accuracy_sam_p1_ext_tbl, cache = FALSE}
 study2_accuracy_sam_p1_ext %>% 
   fixed_coefs_tbl()
+```
+
+```{r study2_accuracy_sam_p1_ext_rfx_tbl, cache = FALSE}
+study2_accuracy_sam_p1_ext %>% 
+  random_coefs_tbl()
 ```
 
 #### P2 Extraversion moderating Hearsay Accuracy
@@ -1602,6 +1807,11 @@ summary(study2_accuracy_sam_p2_ext)
 ```{r study2_accuracy_sam_p2_ext_tbl, cache = FALSE}
 study2_accuracy_sam_p2_ext %>% 
   fixed_coefs_tbl()
+```
+
+```{r study2_accuracy_sam_p2_ext_rfx_tbl, cache = FALSE}
+study2_accuracy_sam_p2_ext %>% 
+  random_coefs_tbl()
 ```
 
 ## Empathy Moderators
@@ -1663,6 +1873,12 @@ study2_consensus_sam_distress %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_consensus_sam_distress_rfx_tbl, cache = FALSE}
+study2_consensus_sam_distress %>% 
+  random_coefs_tbl()
+```
+
+
 #### Empathic Concern moderating Hearsay consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -1697,6 +1913,11 @@ summary(study2_consensus_sam_empathic)
 ```{r study2_consensus_sam_empathic_tbl, cache = FALSE}
 study2_consensus_sam_empathic %>% 
   fixed_coefs_tbl()
+```
+
+```{r study2_consensus_sam_empathic_rfx_tbl, cache = FALSE}
+study2_consensus_sam_empathic %>% 
+  random_coefs_tbl()
 ```
 
 #### Fantasy moderating Hearsay consensus
@@ -1735,6 +1956,11 @@ study2_consensus_sam_fantasy %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_consensus_sam_fantasy_rfx_tbl, cache = FALSE}
+study2_consensus_sam_fantasy %>% 
+  random_coefs_tbl()
+```
+
 ### Perspective Taking moderating Hearsay consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -1769,6 +1995,11 @@ summary(study2_consensus_sam_perspective)
 ```{r study2_consensus_sam_perspective_tbl, cache = FALSE}
 study2_consensus_sam_perspective %>% 
   fixed_coefs_tbl()
+```
+
+```{r study2_consensus_sam_perspective_rfx_tbl, cache = FALSE}
+study2_consensus_sam_perspective %>% 
+  random_coefs_tbl()
 ```
 
 ### Empathy Moderating Accuracy
@@ -1808,6 +2039,10 @@ study2_accuracy_sam_distress %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_accuracy_sam_distress_rfx_tbl, cache = FALSE}
+study2_accuracy_sam_distress %>% 
+  random_coefs_tbl()
+```
 
 #### Empathic Concern moderating Hearsay accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
@@ -1845,6 +2080,10 @@ study2_accuracy_sam_empathic %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_accuracy_sam_empathic_rfx_tbl, cache = FALSE}
+study2_accuracy_sam_empathic %>% 
+  random_coefs_tbl()
+```
 
 #### Fantasy moderating Hearsay accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
@@ -1882,6 +2121,10 @@ study2_accuracy_sam_fantasy %>%
   fixed_coefs_tbl()
 ```
 
+```{r study2_accuracy_sam_fantasy_rfx_tbl, cache = FALSE}
+study2_accuracy_sam_fantasy %>% 
+  random_coefs_tbl()
+```
 #### Perspective Taking moderating Hearsay accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -1987,6 +2230,11 @@ integrated_consensus_sam %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_p1p2_consensus_sam_rfx_tbl, cache = FALSE}
+integrated_consensus_sam %>% 
+  random_coefs_tbl()
+```
+
 ## Self-P1 & Self-P2 in same model
 
 ### Level 1 Equation:
@@ -2057,6 +2305,11 @@ integrated_accuracy_sam_combined %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_accuracy_sam_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_combined %>% 
+  random_coefs_tbl()
+```
+
 ### Simple Slope for p2
 
 ```{r integrated_simple_accuracy_p2}
@@ -2071,6 +2324,11 @@ summary(integrated_accuracy_simple_sam_p2)
 ```{r integrated_simple_accuracy_p2_tbl, cache = FALSE}
 integrated_accuracy_simple_sam_p2 %>% 
   fixed_coefs_tbl()
+```
+
+```{r integrated_simple_accuracy_p2_rfx_tbl, cache = FALSE}
+integrated_accuracy_simple_sam_p2 %>% 
+  random_coefs_tbl()
 ```
 
 ## Extraversion Moderators
@@ -2110,6 +2368,10 @@ integrated_consensus_sam_t_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_consensus_sam_t_ext_rfx_tbl, cache = FALSE}
+integrated_consensus_sam_t_ext %>% 
+  random_coefs_tbl()
+```
 #### P1 Extraversion moderating Hearsay Consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -2144,6 +2406,10 @@ integrated_consensus_sam_p1_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_consensus_sam_p1_ext_rfx_tbl, cache = FALSE}
+integrated_consensus_sam_p1_ext %>% 
+  random_coefs_tbl()
+```
 
 #### P2 Extraversion moderating Hearsay Consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
@@ -2177,6 +2443,11 @@ summary(integrated_consensus_sam_p2_ext)
 ```{r integrated_consensus_sam_p2_ext_tbl, cache = FALSE}
 integrated_consensus_sam_p2_ext %>% 
   fixed_coefs_tbl()
+```
+
+```{r integrated_consensus_sam_p2_ext_rfx_tbl, cache = FALSE}
+integrated_consensus_sam_p2_ext %>% 
+  random_coefs_tbl()
 ```
 
 ### Extraversion Moderating Hearsay Accuracy
@@ -2214,6 +2485,11 @@ integrated_accuracy_sam_t_ext %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_accuracy_sam_t_ext_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_t_ext %>% 
+  random_coefs_tbl()
+```
+
 #### P1 Extraversion moderating Hearsay Accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -2246,6 +2522,11 @@ summary(integrated_accuracy_sam_p1_ext)
 ```{r integrated_accuracy_sam_p1_ext_tbl, cache = FALSE}
 integrated_accuracy_sam_p1_ext %>% 
   fixed_coefs_tbl()
+```
+
+```{r integrated_accuracy_sam_p1_ext_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_p1_ext %>% 
+  random_coefs_tbl()
 ```
 
 #### P2 Extraversion moderating Hearsay Accuracy
@@ -2281,6 +2562,11 @@ summary(integrated_accuracy_sam_p2_ext)
 ```{r integrated_accuracy_sam_p2_ext_tbl, cache = FALSE}
 integrated_accuracy_sam_p2_ext %>% 
   fixed_coefs_tbl()
+```
+
+```{r integrated_accuracy_sam_p2_ext_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_p2_ext %>% 
+  random_coefs_tbl()
 ```
 
 ## Empathy Moderators
@@ -2322,6 +2608,11 @@ integrated_consensus_sam_distress %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_consensus_sam_distress_rfx_tbl, cache = FALSE}
+integrated_consensus_sam_distress %>% 
+  random_coefs_tbl()
+```
+
 #### Empathic Concern moderating Hearsay consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -2356,6 +2647,11 @@ summary(integrated_consensus_sam_empathic)
 ```{r integrated_consensus_sam_empathic_tbl, cache = FALSE}
 integrated_consensus_sam_empathic %>% 
   fixed_coefs_tbl()
+```
+
+```{r integrated_consensus_sam_empathic_rfx_tbl, cache = FALSE}
+integrated_consensus_sam_empathic %>% 
+  random_coefs_tbl()
 ```
 
 #### Fantasy moderating Hearsay consensus
@@ -2394,6 +2690,11 @@ integrated_consensus_sam_fantasy %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_consensus_sam_fantasy_rfx_tbl, cache = FALSE}
+integrated_consensus_sam_fantasy %>% 
+  random_coefs_tbl()
+```
+
 ### Perspective Taking moderating Hearsay consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -2428,6 +2729,11 @@ summary(integrated_consensus_sam_perspective)
 ```{r integrated_consensus_sam_perspective_tbl, cache = FALSE}
 integrated_consensus_sam_perspective %>% 
   fixed_coefs_tbl()
+```
+
+```{r integrated_consensus_sam_perspective_rfx_tbl, cache = FALSE}
+integrated_consensus_sam_perspective %>% 
+  random_coefs_tbl()
 ```
 
 ### Empathy Moderating Accuracy
@@ -2467,6 +2773,11 @@ integrated_accuracy_sam_distress %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_accuracy_sam_distress_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_distress %>% 
+  random_coefs_tbl()
+```
+
 #### Empathic Concern moderating Hearsay accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -2501,6 +2812,11 @@ summary(integrated_accuracy_sam_empathic)
 ```{r integrated_accuracy_sam_empathic_tbl, cache = FALSE}
 integrated_accuracy_sam_empathic %>% 
   fixed_coefs_tbl()
+```
+
+```{r integrated_accuracy_sam_empathic_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_empathic %>% 
+  random_coefs_tbl()
 ```
 
 #### Fantasy moderating Hearsay accuracy
@@ -2539,6 +2855,11 @@ integrated_accuracy_sam_fantasy %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_accuracy_sam_fantasy_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_fantasy %>% 
+  random_coefs_tbl()
+```
+
 #### Perspective Taking moderating Hearsay accuracy
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
@@ -2575,3 +2896,7 @@ integrated_accuracy_sam_perspective %>%
   fixed_coefs_tbl()
 ```
 
+```{r integrated_accuracy_sam_perspective_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_perspective %>% 
+  random_coefs_tbl()
+```
