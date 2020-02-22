@@ -28,12 +28,15 @@ library(ReputationModelR)
 library(lme4)
 library(lmerTest)
 library(kableExtra)
-study1 <- import("Data/rep_s1_4ms.csv")
+study1 <- import("Data/rep_s1_4ms.csv") %>% 
+  mutate(study = "study 1")
 study2 <- import("Data/rep_s2_4ms.csv") %>% 
   # missing condition are "", but need to be NA
-  mutate(condition = ifelse(condition == "", NA, condition))
+  mutate(condition = ifelse(condition == "", NA, condition),
+         study = "study 2")
 item_pos <- import("Data/rep_BigSix_Evaluativeness.csv")
 ```
+
 
 ## Reshape Study 1 Data for Profile Analyses
 
@@ -421,34 +424,8 @@ psych::scoreItems(iri_keys,
   
 ```
 
-# Study 1 Hearsay SAM
-## P1-P2 Agreement 
-
-### Level 1 Equation:
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + r_{3tg}$
-
-### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$  
-$\beta_{30g} = \gamma_{300} + u_{30g}$  
-
-*i* = item; *t* = triad; *g* = group
-```{r study1_p1p2_consensus_sam}
-study1_consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + pos +
-                         (1 + p1_norm + p1_dist + pos | sess_id/triad_id),
-                       data = study1_profiles)
-
-summary(study1_consensus_sam)
-```
-
-
+# Hearsay SAM with Integrated (combined Study 1 & 2 data)
+## functions for tables
 ```{r fixed_fx_tbl_funs, cache = FALSE}
 lm_beta_lmer <- function(mod) {
    b <- fixef(mod)[-1]
@@ -713,1456 +690,6 @@ random_coefs_tbl <- function(model){
 ```
 
 
-```{r study1_p1p2_consensus_sam_tbl, cache = FALSE}
-study1_consensus_sam %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_p1p2_consensus_sam_rfx_tbl, cache = FALSE}
-study1_consensus_sam %>% 
-  random_coefs_tbl()
-```
-
-## Self-P1 & Self-P2 in same model
-
-### Level 1 Equation:
-$P_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distance_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distance_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distance_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distance_{tg} + r_{2tg}$    
-
-### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_accuracy_sam}
-study1_profiles2 <- study1_profiles %>% 
-  select(sess_id, triad_id, item, self_norm, self_dist, pos, p1, p2) %>% 
-  gather(distance, rating, -(sess_id:pos))
-
-study1_accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + pos + distance +
-                               distance:self_norm + distance:self_dist + distance:pos +
-                               (1 + self_norm + self_dist + distance +
-                                  distance:self_norm + distance:self_dist + distance:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles2)
-summary(study1_accuracy_sam_combined)
-```
-
-```{r study1_accuracy_sam_tbl, cache = FALSE}
-study1_accuracy_sam_combined %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_accuracy_sam_rfx_tbl, cache = FALSE}
-study1_accuracy_sam_combined %>% 
-  random_coefs_tbl()
-```
-
-### Simple Slope for p2
-
-```{r study1_simple_accuracy_p2}
-
-study1_accuracy_simple_sam_p2 <- lmer(p2 ~ self_norm + self_dist + pos +
-                               (1 + self_norm + self_dist + pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_accuracy_simple_sam_p2)
-```
-
-```{r study1_p2_simple_tbl, cache = FALSE}
-study1_accuracy_simple_sam_p2 %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_p2_simple_rfx_tbl, cache = FALSE}
-study1_accuracy_simple_sam_p2 %>% 
-  random_coefs_tbl()
-```
-
-## Extraversion Moderators
-
-### adding target, P1, and P2 Extraversion to profile data
-
-```{r study1_add_extr_to_profs}
-# joining in target Extraversion
-study1_profiles <- study1 %>% 
-  select(sess_id, ends_with("extraversion")) %>% 
-  gather(var, t_ext, -sess_id) %>% 
-  separate(var, c("perceiver", "target", "variable")) %>%
-  filter(perceiver == target & perceiver == "A" | 
-         perceiver == target & perceiver == "C") %>%
-  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
-  mutate(t_ext_cent = t_ext - mean(t_ext, na.rm = TRUE)) %>% 
-  select(sess_id, triad_id, t_ext_cent) %>% 
-  right_join(study1_profiles)
-
-# joining in P1 Extraversion
-study1_profiles <- study1 %>% 
-  select(sess_id, ends_with("extraversion")) %>% 
-  gather(var, p1_ext, -sess_id) %>% 
-  separate(var, c("perceiver", "target", "variable")) %>%
-  filter(perceiver == "A" & target == "C" | 
-         perceiver == "C" & target == "A") %>%
-  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
-  mutate(p1_ext_cent = p1_ext - mean(p1_ext, na.rm = TRUE)) %>% 
-  select(sess_id, triad_id, p1_ext_cent) %>% 
-  right_join(study1_profiles)
-
-# joining in P2 Extraversion
-
-study1_profiles <- study1 %>% 
-  select(sess_id, ends_with("extraversion")) %>% 
-  gather(var, p2_ext, -sess_id) %>% 
-  separate(var, c("perceiver", "target", "variable")) %>%
-  filter(perceiver == "B" & target == "C" | 
-         perceiver == "D" & target == "A") %>%
-  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
-  mutate(p2_ext_cent = p2_ext - mean(p2_ext, na.rm = TRUE)) %>% 
-  select(sess_id, triad_id, p2_ext_cent) %>% 
-  right_join(study1_profiles)
-```
-
-### Extraversion Moderating Hearsay Consensus
-#### Target Extraversion moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_consensus_x_target_ext_sam}
-study1_consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist +
-                                     pos + t_ext_cent +
-                                     t_ext_cent:p1_norm + 
-                                     t_ext_cent:p1_dist + 
-                                     t_ext_cent:pos +
-                               (1 + p1_norm + p1_dist + 
-                                  t_ext_cent + 
-                                  t_ext_cent:p1_norm +
-                                  t_ext_cent:p1_dist + 
-                                  t_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_consensus_sam_t_ext)
-```
-
-```{r study1_consensus_sam_t_ext_tbl, cache = FALSE}
-study1_consensus_sam_t_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_consensus_sam_t_ext_rfx_tbl, cache = FALSE}
-study1_consensus_sam_t_ext %>% 
-  random_coefs_tbl()
-```
-
-
-#### P1 Extraversion moderating Hearsay Consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_consensus_x_p1_ext_sam}
-study1_consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + 
-                                      pos + p1_ext_cent +
-                                      p1_ext_cent:p1_norm + 
-                                      p1_ext_cent:p1_dist + 
-                                      p1_ext_cent:pos +
-                               (1 + p1_norm + p1_dist + 
-                                  p1_ext_cent + p1_ext_cent:p1_norm +
-                                  p1_ext_cent:p1_dist + p1_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_consensus_sam_p1_ext)
-```
-
-```{r study1_consensus_sam_p1_ext_tbl, cache = FALSE}
-study1_consensus_sam_p1_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_consensus_sam_p1_ext_rfx_tbl, cache = FALSE}
-study1_consensus_sam_p1_ext %>% 
-  random_coefs_tbl()
-```
-
-#### P2 Extraversion moderating Hearsay Consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_consensus_x_p2_ext_sam}
-study1_consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + pos + p2_ext_cent +
-                               p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + 
-                                 p2_ext_cent:pos +
-                               (1 + p1_norm + p1_dist + p2_ext_cent +
-                                  p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + 
-                                  p2_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_consensus_sam_p2_ext)
-```
-
-```{r study1_consensus_sam_p2_ext_tbl, cache = FALSE}
-study1_consensus_sam_p2_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_consensus_sam_p2_ext_rfx_tbl, cache = FALSE}
-study1_consensus_sam_p2_ext %>% 
-  random_coefs_tbl()
-```
-
-### Extraversion Moderating Hearsay Accuracy
-#### Target Extraversion moderating Hearsay Accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_accuracy_x_target_ext_sam}
-study1_accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + pos + t_ext_cent +
-                               t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:pos +
-                               (1 + self_norm + self_dist + t_ext_cent +
-                                  t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_accuracy_sam_t_ext)
-```
-
-```{r study1_accuracy_sam_t_ext_tbl, cache = FALSE}
-study1_accuracy_sam_t_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_accuracy_sam_t_ext_rfx_tbl, cache = FALSE}
-study1_accuracy_sam_t_ext %>% 
-  random_coefs_tbl()
-```
-
-#### P1 Extraversion moderating Hearsay Accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_accuracy_x_p1_ext_sam}
-study1_accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + pos + p1_ext_cent +
-                               p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:pos +
-                               (1 + self_norm + self_dist + p1_ext_cent +
-                                  p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_accuracy_sam_p1_ext)
-```
-
-```{r study1_accuracy_sam_p1_ext_tbl, cache = FALSE}
-study1_accuracy_sam_p1_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_accuracy_sam_p1_ext_rfx_tbl, cache = FALSE}
-study1_accuracy_sam_p1_ext %>% 
-  random_coefs_tbl()
-```
-
-#### P2 Extraversion moderating Hearsay Accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_accuracy_x_p2_ext_sam}
-study1_accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + pos + p2_ext_cent +
-                               p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:pos +
-                               (1 + self_norm + self_dist + p2_ext_cent +
-                                  p2_ext_cent:self_norm + 
-                                  p2_ext_cent:self_dist + p2_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_accuracy_sam_p2_ext)
-```
-
-```{r study1_accuracy_sam_p2_ext_tbl, cache = FALSE}
-study1_accuracy_sam_p2_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_accuracy_sam_p2_ext_rfx_tbl, cache = FALSE}
-study1_accuracy_sam_p2_ext %>% 
-  random_coefs_tbl()
-```
-
-## Empathy Moderators
-
-### adding P2 Empathy to profile data
-
-```{r study1_adding_emp_profs}
-# joining in P2 Empathy
-study1_profiles <- study1 %>% 
-  select(sess_id, B_iri_distress, B_iri_empathic, B_iri_fantasy, B_iri_perspective,
-         D_iri_distress, D_iri_empathic, D_iri_fantasy, D_iri_perspective) %>% 
-  gather(var, value, -sess_id) %>% 
-  separate(var, c("p2", "elim", "variable")) %>%
-  mutate(triad_id = ifelse(p2 == "B", "CAB", "ACD")) %>%
-  spread(variable, value) %>% 
-  mutate(distress_cent = distress - mean(distress, na.rm = TRUE),
-         empathic_cent = empathic - mean(empathic, na.rm = TRUE),
-         fantasy_cent = fantasy - mean(fantasy, na.rm = TRUE),
-         perspective_cent = perspective - mean(perspective, na.rm = TRUE))%>% 
-  select(sess_id, triad_id, distress_cent, empathic_cent,
-         fantasy_cent, perspective_cent) %>% 
-  right_join(study1_profiles)
-```
-
-### Empathy Moderating Consensus
-#### Distress moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_consensus_x_distress}
-study1_consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + pos + distress_cent +
-                               distress_cent:p1_norm + distress_cent:p1_dist + 
-                                 distress_cent:pos +
-                               (1 + p1_norm + p1_dist + distress_cent +
-                                  distress_cent:p1_norm + 
-                                  distress_cent:p1_dist + distress_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_consensus_sam_distress)
-```
-
-```{r study1_consensus_sam_distress}
-study1_consensus_sam_distress %>% 
-  fixed_coefs_tbl()
-```
-
-#### Empathic Concern moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_consensus_x_empathic}
-study1_consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + pos + empathic_cent +
-                               empathic_cent:p1_norm + 
-                                 empathic_cent:p1_dist + empathic_cent:pos +
-                               (1 + p1_norm + p1_dist + empathic_cent +
-                                  empathic_cent:p1_norm + 
-                                  empathic_cent:p1_dist + empathic_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_consensus_sam_empathic)
-```
-
-```{r study1_consensus_sam_empathic_tbl, cache = FALSE}
-study1_consensus_sam_empathic %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_consensus_sam_empathic_rfx_tbl, cache = FALSE}
-study1_consensus_sam_empathic %>% 
-  random_coefs_tbl()
-```
-
-#### Fantasy moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_consensus_x_fantasy}
-study1_consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + pos + fantasy_cent +
-                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
-                                 fantasy_cent:pos +
-                               (1 + p1_norm + p1_dist + fantasy_cent +
-                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
-                                  fantasy_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_consensus_sam_fantasy)
-```
-
-```{r study1_consensus_sam_fantasy_tbl, cache = FALSE}
-study1_consensus_sam_fantasy %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_consensus_sam_fantasy_rfx_tbl, cache = FALSE}
-study1_consensus_sam_fantasy %>% 
-  random_coefs_tbl()
-```
-
-### Perspective Taking moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_consensus_x_perspective}
-study1_consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + pos + perspective_cent +
-                               perspective_cent:p1_norm + 
-                                 perspective_cent:p1_dist + perspective_cent:pos +
-                               (1 + p1_norm + p1_dist + perspective_cent +
-                                  perspective_cent:p1_norm + 
-                                  perspective_cent:p1_dist + perspective_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_consensus_sam_perspective)
-```
-
-```{r study1_consensus_sam_perspective_tbl, cache = FALSE}
-study1_consensus_sam_perspective %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_consensus_sam_perspective_rfx_tbl, cache = FALSE}
-study1_consensus_sam_perspective %>% 
-  random_coefs_tbl()
-```
-
-### Empathy Moderating Accuracy
-#### Distress moderating Hearsay accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_accuracy_x_distress}
-study1_accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + pos + distress_cent +
-                               distress_cent:self_norm + distress_cent:self_dist +
-                                 distress_cent:pos +
-                               (1 + self_norm + self_dist + distress_cent +
-                                  distress_cent:self_norm + 
-                                  distress_cent:self_dist + distress_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_accuracy_sam_distress)
-```
-
-```{r study1_accuracy_sam_distress_tbl, cache = FALSE}
-study1_accuracy_sam_distress %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_accuracy_sam_distress_rfx_tbl, cache = FALSE}
-study1_accuracy_sam_distress %>% 
-  random_coefs_tbl()
-```
-
-#### Empathic Concern moderating Hearsay accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_accuracy_x_empathic}
-study1_accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + pos + empathic_cent +
-                               empathic_cent:self_norm + empathic_cent:self_dist + 
-                                 empathic_cent:pos +
-                               (1 + self_norm + self_dist + empathic_cent +
-                                  empathic_cent:self_norm + 
-                                  empathic_cent:self_dist + empathic_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_accuracy_sam_empathic)
-```
-
-```{r study1_accuracy_sam_empathic_tbl, cache = FALSE}
-study1_accuracy_sam_empathic %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_accuracy_sam_empathic_rfx_tbl, cache = FALSE}
-study1_accuracy_sam_empathic %>% 
-  random_coefs_tbl()
-```
-
-#### Fantasy moderating Hearsay accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_accuracy_x_fantasy}
-study1_accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + pos + fantasy_cent +
-                               fantasy_cent:self_norm +
-                                 fantasy_cent:self_dist + fantasy_cent:pos +
-                               (1 + self_norm + self_dist + fantasy_cent +
-                                  fantasy_cent:self_norm + 
-                                  fantasy_cent:self_dist + fantasy_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_accuracy_sam_fantasy)
-```
-
-```{r study1_accuracy_sam_fantasy_tbl, cache = FALSE}
-study1_accuracy_sam_fantasy %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_accuracy_sam_fantasy_rfx_tbl, cache = FALSE}
-study1_accuracy_sam_fantasy %>% 
-  random_coefs_tbl()
-```
-
-
-#### Perspective Taking moderating Hearsay accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study1_accuracy_x_perspective}
-study1_accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + pos + perspective_cent +
-                               perspective_cent:self_norm + 
-                                 perspective_cent:self_dist + perspective_cent:pos +
-                               (1 + self_norm + self_dist + perspective_cent +
-                                  perspective_cent:self_norm + 
-                                  perspective_cent:self_dist + perspective_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study1_profiles)
-summary(study1_accuracy_sam_perspective)
-```
-
-```{r study1_accuracy_sam_perspective_tbl, cache = FALSE}
-study1_accuracy_sam_perspective %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study1_accuracy_sam_perspective_rfx_tbl, cache = FALSE}
-study1_accuracy_sam_perspective %>% 
-  random_coefs_tbl()
-```
-
-
-# Study 2 Hearsay SAM
-## P1-P2 Agreement 
-
-### Level 1 Equation:
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + r_{3tg}$
-
-### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$  
-$\beta_{30g} = \gamma_{300} + u_{30g}$  
-
-*i* = item; *t* = triad; *g* = group
-```{r study2_p1p2_consensus_sam}
-study2_consensus_sam <- lmer(p2 ~ p1_norm + p1_dist + pos +
-                         (1 + p1_norm + p1_dist + pos | sess_id/triad_id),
-                       data = study2_profiles)
-
-summary(study2_consensus_sam)
-```
-
-```{r study2_p1p2_consensus_sam_tbl, cache = FALSE}
-study2_consensus_sam %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_p1p2_consensus_sam_rfx_tbl, cache = FALSE}
-study2_consensus_sam %>% 
-  random_coefs_tbl()
-```
-
-## Self-P1 & Self-P2 in same model
-
-### Level 1 Equation:
-$P_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distance_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distance_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distance_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distance_{tg} + r_{2tg}$    
-
-### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_accuracy_sam}
-study2_profiles2 <- study2_profiles %>% 
-  select(sess_id, triad_id, item, self_norm, self_dist, pos, p1, p2) %>% 
-  gather(distance, rating, -(sess_id:pos))
-
-study2_accuracy_sam_combined <- lmer(rating ~ self_norm + self_dist + pos + distance +
-                               distance:self_norm + distance:self_dist + distance:pos +
-                               (1 + self_norm + self_dist + distance +
-                                  distance:self_norm + distance:self_dist + distance:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles2)
-summary(study2_accuracy_sam_combined)
-```
-
-```{r study2_accuracy_sam_tbl, cache = FALSE}
-study2_accuracy_sam_combined %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_accuracy_sam_rfx_tbl, cache = FALSE}
-study2_accuracy_sam_combined %>% 
-  random_coefs_tbl()
-```
-
-### Simple Slope for p2
-
-```{r study2_simple_accuracy_p2}
-
-study2_accuracy_simple_sam_p2 <- lmer(p2 ~ self_norm + self_dist + pos +
-                               (1 + self_norm + self_dist + pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_accuracy_simple_sam_p2)
-```
-
-```{r study2_simple_accuracy_p2_tbl, cache = FALSE}
-study2_accuracy_simple_sam_p2 %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_simple_accuracy_p2_rfx_tbl, cache = FALSE}
-study2_accuracy_simple_sam_p2 %>% 
-  random_coefs_tbl()
-```
-
-## Extraversion Moderators
-
-### adding target, P1, and P2 Extraversion to profile data
-
-```{r study2_add_extr_to_profs}
-# joining in target Extraversion
-study2_profiles <- study2 %>% 
-  select(sess_id, ends_with("extraversion")) %>% 
-  gather(var, t_ext, -sess_id) %>% 
-  separate(var, c("perceiver", "target", "variable")) %>%
-  filter(perceiver == target & perceiver == "A" | 
-         perceiver == target & perceiver == "C") %>%
-  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
-  mutate(t_ext_cent = t_ext - mean(t_ext, na.rm = TRUE)) %>% 
-  select(sess_id, triad_id, t_ext_cent) %>% 
-  right_join(study2_profiles)
-
-# joining in P1 Extraversion
-study2_profiles <- study2 %>% 
-  select(sess_id, ends_with("extraversion")) %>% 
-  gather(var, p1_ext, -sess_id) %>% 
-  separate(var, c("perceiver", "target", "variable")) %>%
-  filter(perceiver == "A" & target == "C" | 
-         perceiver == "C" & target == "A") %>%
-  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
-  mutate(p1_ext_cent = p1_ext - mean(p1_ext, na.rm = TRUE)) %>% 
-  select(sess_id, triad_id, p1_ext_cent) %>% 
-  right_join(study2_profiles)
-
-# joining in P2 Extraversion
-
-study2_profiles <- study2 %>% 
-  select(sess_id, ends_with("extraversion")) %>% 
-  gather(var, p2_ext, -sess_id) %>% 
-  separate(var, c("perceiver", "target", "variable")) %>%
-  filter(perceiver == "B" & target == "C" | 
-         perceiver == "D" & target == "A") %>%
-  mutate(triad_id = ifelse(target == "A", "ACD", "CAB")) %>%
-  mutate(p2_ext_cent = p2_ext - mean(p2_ext, na.rm = TRUE)) %>% 
-  select(sess_id, triad_id, p2_ext_cent) %>% 
-  right_join(study2_profiles)
-```
-
-### Extraversion Moderating Hearsay Consensus
-#### Target Extraversion moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_consensus_x_target_ext_sam}
-study2_consensus_sam_t_ext <- lmer(p2 ~ p1_norm + p1_dist + pos + t_ext_cent +
-                               t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:pos +
-                               (1 + p1_norm + p1_dist + t_ext_cent +
-                                  t_ext_cent:p1_norm + t_ext_cent:p1_dist + t_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_consensus_sam_t_ext)
-```
-
-```{r study2_consensus_sam_t_ext_tbl, cache = FALSE}
-study2_consensus_sam_t_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_consensus_sam_t_ext_rfx_tbl, cache = FALSE}
-study2_consensus_sam_t_ext %>% 
-  random_coefs_tbl()
-```
-
-#### P1 Extraversion moderating Hearsay Consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_consensus_x_p1_ext_sam}
-study2_consensus_sam_p1_ext <- lmer(p2 ~ p1_norm + p1_dist + pos + p1_ext_cent +
-                               p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:pos +
-                               (1 + p1_norm + p1_dist + p1_ext_cent +
-                                  p1_ext_cent:p1_norm + p1_ext_cent:p1_dist + p1_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_consensus_sam_p1_ext)
-```
-
-```{r study2_consensus_sam_p1_ext_tbl, cache = FALSE}
-study2_consensus_sam_p1_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_consensus_sam_p1_ext_rfx_tbl, cache = FALSE}
-study2_consensus_sam_p1_ext %>% 
-  random_coefs_tbl()
-```
-
-#### P2 Extraversion moderating Hearsay Consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_consensus_x_p2_ext_sam}
-study2_consensus_sam_p2_ext <- lmer(p2 ~ p1_norm + p1_dist + pos + p2_ext_cent +
-                               p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:pos +
-                               (1 + p1_norm + p1_dist + p2_ext_cent +
-                                  p2_ext_cent:p1_norm + p2_ext_cent:p1_dist + p2_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_consensus_sam_p2_ext)
-```
-
-```{r study2_consensus_sam_p2_ext_tbl, cache = FALSE}
-study2_consensus_sam_p2_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_consensus_sam_p2_ext_rfx_tbl, cache = FALSE}
-study2_consensus_sam_p2_ext %>% 
-  random_coefs_tbl()
-```
-
-### Extraversion Moderating Hearsay Accuracy
-#### Target Extraversion moderating Hearsay Accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_accuracy_x_target_ext_sam}
-study2_accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + pos + t_ext_cent +
-                               t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:pos +
-                               (1 + self_norm + self_dist + t_ext_cent +
-                                  t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_accuracy_sam_t_ext)
-```
-
-```{r study2_accuracy_sam_t_ext_tbl, cache = FALSE}
-study2_accuracy_sam_t_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_accuracy_sam_t_ext_rfx_tbl, cache = FALSE}
-study2_accuracy_sam_t_ext %>% 
-  random_coefs_tbl()
-```
-
-#### P1 Extraversion moderating Hearsay Accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_accuracy_x_p1_ext_sam}
-study2_accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + pos + p1_ext_cent +
-                               p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:pos +
-                               (1 + self_norm + self_dist + p1_ext_cent +
-                                  p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_accuracy_sam_p1_ext)
-```
-
-```{r study2_accuracy_sam_p1_ext_tbl, cache = FALSE}
-study2_accuracy_sam_p1_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_accuracy_sam_p1_ext_rfx_tbl, cache = FALSE}
-study2_accuracy_sam_p1_ext %>% 
-  random_coefs_tbl()
-```
-
-#### P2 Extraversion moderating Hearsay Accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_accuracy_x_p2_ext_sam}
-study2_accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + pos + p2_ext_cent +
-                               p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:pos +
-                               (1 + self_norm + self_dist + p2_ext_cent +
-                                  p2_ext_cent:self_norm + 
-                                  p2_ext_cent:self_dist + p2_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_accuracy_sam_p2_ext)
-```
-
-```{r study2_accuracy_sam_p2_ext_tbl, cache = FALSE}
-study2_accuracy_sam_p2_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_accuracy_sam_p2_ext_rfx_tbl, cache = FALSE}
-study2_accuracy_sam_p2_ext %>% 
-  random_coefs_tbl()
-```
-
-## Empathy Moderators
-
-### adding P2 Empathy to profile data
-
-```{r study2_adding_emp_profs}
-# joining in P2 Empathy
-study2_profiles <- study2 %>% 
-  select(sess_id, B_iri_distress, B_iri_empathic, B_iri_fantasy, B_iri_perspective,
-         D_iri_distress, D_iri_empathic, D_iri_fantasy, D_iri_perspective) %>% 
-  gather(var, value, -sess_id) %>% 
-  separate(var, c("p2", "elim", "variable")) %>%
-  mutate(triad_id = ifelse(p2 == "B", "CAB", "ACD")) %>%
-  spread(variable, value) %>% 
-  mutate(distress_cent = distress - mean(distress, na.rm = TRUE),
-         empathic_cent = empathic - mean(empathic, na.rm = TRUE),
-         fantasy_cent = fantasy - mean(fantasy, na.rm = TRUE),
-         perspective_cent = perspective - mean(perspective, na.rm = TRUE))%>% 
-  select(sess_id, triad_id, distress_cent, empathic_cent,
-         fantasy_cent, perspective_cent) %>% 
-  right_join(study2_profiles)
-```
-
-### Empathy Moderating Consensus
-#### Distress moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_consensus_x_distress}
-study2_consensus_sam_distress <- lmer(p2 ~ p1_norm + p1_dist + pos + distress_cent +
-                               distress_cent:p1_norm + distress_cent:p1_dist + 
-                                 distress_cent:pos +
-                               (1 + p1_norm + p1_dist + distress_cent +
-                                  distress_cent:p1_norm + 
-                                  distress_cent:p1_dist + distress_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_consensus_sam_distress)
-```
-
-```{r study2_consensus_sam_distress_tbl, cache = FALSE}
-study2_consensus_sam_distress %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_consensus_sam_distress_rfx_tbl, cache = FALSE}
-study2_consensus_sam_distress %>% 
-  random_coefs_tbl()
-```
-
-
-#### Empathic Concern moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_consensus_x_empathic}
-study2_consensus_sam_empathic <- lmer(p2 ~ p1_norm + p1_dist + pos + empathic_cent +
-                               empathic_cent:p1_norm + 
-                                 empathic_cent:p1_dist + empathic_cent:pos +
-                               (1 + p1_norm + p1_dist + empathic_cent +
-                                  empathic_cent:p1_norm + 
-                                  empathic_cent:p1_dist + empathic_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_consensus_sam_empathic)
-```
-
-```{r study2_consensus_sam_empathic_tbl, cache = FALSE}
-study2_consensus_sam_empathic %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_consensus_sam_empathic_rfx_tbl, cache = FALSE}
-study2_consensus_sam_empathic %>% 
-  random_coefs_tbl()
-```
-
-#### Fantasy moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_consensus_x_fantasy}
-study2_consensus_sam_fantasy <- lmer(p2 ~ p1_norm + p1_dist + pos + fantasy_cent +
-                               fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
-                                 fantasy_cent:pos +
-                               (1 + p1_norm + p1_dist + fantasy_cent +
-                                  fantasy_cent:p1_norm + fantasy_cent:p1_dist + 
-                                  fantasy_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_consensus_sam_fantasy)
-```
-
-```{r study2_consensus_sam_fantasy_tbl, cache = FALSE}
-study2_consensus_sam_fantasy %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_consensus_sam_fantasy_rfx_tbl, cache = FALSE}
-study2_consensus_sam_fantasy %>% 
-  random_coefs_tbl()
-```
-
-### Perspective Taking moderating Hearsay consensus
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_consensus_x_perspective}
-study2_consensus_sam_perspective <- lmer(p2 ~ p1_norm + p1_dist + pos + perspective_cent +
-                               perspective_cent:p1_norm + 
-                                 perspective_cent:p1_dist + perspective_cent:pos +
-                               (1 + p1_norm + p1_dist + perspective_cent +
-                                  perspective_cent:p1_norm + 
-                                  perspective_cent:p1_dist + perspective_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_consensus_sam_perspective)
-```
-
-```{r study2_consensus_sam_perspective_tbl, cache = FALSE}
-study2_consensus_sam_perspective %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_consensus_sam_perspective_rfx_tbl, cache = FALSE}
-study2_consensus_sam_perspective %>% 
-  random_coefs_tbl()
-```
-
-### Empathy Moderating Accuracy
-#### Distress moderating Hearsay accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Distress_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Distress_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Distress_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Distress_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_accuracy_x_distress}
-study2_accuracy_sam_distress <- lmer(p2 ~ self_norm + self_dist + pos + distress_cent +
-                               distress_cent:self_norm + distress_cent:self_dist +
-                                 distress_cent:pos +
-                               (1 + self_norm + self_dist + distress_cent +
-                                  distress_cent:self_norm + 
-                                  distress_cent:self_dist + distress_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_accuracy_sam_distress)
-```
-
-```{r study2_accuracy_sam_distress_tbl, cache = FALSE}
-study2_accuracy_sam_distress %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_accuracy_sam_distress_rfx_tbl, cache = FALSE}
-study2_accuracy_sam_distress %>% 
-  random_coefs_tbl()
-```
-
-#### Empathic Concern moderating Hearsay accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}EmpathicConcern_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}EmpathicConcern_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}EmpathicConcern_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}EmpathicConcern_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_accuracy_x_empathic}
-study2_accuracy_sam_empathic <- lmer(p2 ~ self_norm + self_dist + pos + empathic_cent +
-                               empathic_cent:self_norm + empathic_cent:self_dist + 
-                                 empathic_cent:pos +
-                               (1 + self_norm + self_dist + empathic_cent +
-                                  empathic_cent:self_norm + 
-                                  empathic_cent:self_dist + empathic_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_accuracy_sam_empathic)
-```
-
-```{r study2_accuracy_sam_empathic_tbl, cache = FALSE}
-study2_accuracy_sam_empathic %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_accuracy_sam_empathic_rfx_tbl, cache = FALSE}
-study2_accuracy_sam_empathic %>% 
-  random_coefs_tbl()
-```
-
-#### Fantasy moderating Hearsay accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}Fantasy_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}Fantasy_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}Fantasy_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}Fantasy_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_accuracy_x_fantasy}
-study2_accuracy_sam_fantasy <- lmer(p2 ~ self_norm + self_dist + pos + fantasy_cent +
-                               fantasy_cent:self_norm +
-                                 fantasy_cent:self_dist + fantasy_cent:pos +
-                               (1 + self_norm + self_dist + fantasy_cent +
-                                  fantasy_cent:self_norm + 
-                                  fantasy_cent:self_dist + fantasy_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_accuracy_sam_fantasy)
-```
-
-```{r study2_accuracy_sam_fantasy_tbl, cache = FALSE}
-study2_accuracy_sam_fantasy %>% 
-  fixed_coefs_tbl()
-```
-
-```{r study2_accuracy_sam_fantasy_rfx_tbl, cache = FALSE}
-study2_accuracy_sam_fantasy %>% 
-  random_coefs_tbl()
-```
-#### Perspective Taking moderating Hearsay accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}PerspectiveTaking_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}PerspectiveTaking_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}PerspectiveTaking_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}PerspectiveTaking_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r study2_accuracy_x_perspective}
-study2_accuracy_sam_perspective <- lmer(p2 ~ self_norm + self_dist + pos + perspective_cent +
-                               perspective_cent:self_norm + 
-                                 perspective_cent:self_dist + perspective_cent:pos +
-                               (1 + self_norm + self_dist + perspective_cent +
-                                  perspective_cent:self_norm + 
-                                  perspective_cent:self_dist + perspective_cent:pos | 
-                                  sess_id/triad_id),
-                             data = study2_profiles)
-summary(study2_accuracy_sam_perspective)
-```
-
-```{r}
-study2_accuracy_sam_perspective %>% 
-  fixed_coefs_tbl()
-```
-
-# Integrated Hearsay SAM
-
 ## Combining Study 1 and 2 for integrated analyses
 
 ```{r combine_data}
@@ -2331,7 +858,7 @@ integrated_accuracy_simple_sam_p2 %>%
   random_coefs_tbl()
 ```
 
-## Extraversion Moderators
+## Individual Difference Moderators
 
 ### Extraversion Moderating Hearsay Consensus
 #### Target Extraversion moderating Hearsay consensus
@@ -2450,126 +977,6 @@ integrated_consensus_sam_p2_ext %>%
   random_coefs_tbl()
 ```
 
-### Extraversion Moderating Hearsay Accuracy
-#### Target Extraversion moderating Hearsay Accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-##### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
-
-##### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r integrated_accuracy_x_target_ext_sam}
-integrated_accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + pos + t_ext_cent +
-                               t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:pos +
-                               (1 + self_norm + self_dist + t_ext_cent +
-                                  t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = integrated_profiles)
-summary(integrated_accuracy_sam_t_ext)
-```
-
-```{r integrated_accuracy_sam_t_ext_tbl, cache = FALSE}
-integrated_accuracy_sam_t_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r integrated_accuracy_sam_t_ext_rfx_tbl, cache = FALSE}
-integrated_accuracy_sam_t_ext %>% 
-  random_coefs_tbl()
-```
-
-#### P1 Extraversion moderating Hearsay Accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r integrated_accuracy_x_p1_ext_sam}
-integrated_accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + pos + p1_ext_cent +
-                               p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:pos +
-                               (1 + self_norm + self_dist + p1_ext_cent +
-                                  p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = integrated_profiles)
-summary(integrated_accuracy_sam_p1_ext)
-```
-
-```{r integrated_accuracy_sam_p1_ext_tbl, cache = FALSE}
-integrated_accuracy_sam_p1_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r integrated_accuracy_sam_p1_ext_rfx_tbl, cache = FALSE}
-integrated_accuracy_sam_p1_ext %>% 
-  random_coefs_tbl()
-```
-
-#### P2 Extraversion moderating Hearsay Accuracy
-$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
-
-#### Level 2 Equation: 
-$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
-$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
-$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
-$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
-
-#### Level 3 Equation:
-$\beta_{00g} = \gamma_{000} + u_{00g}$   
-$\beta_{01g} = \gamma_{010} + u_{01g}$   
-$\beta_{10g} = \gamma_{100} + u_{10g}$   
-$\beta_{11g} = \gamma_{110} + u_{11g}$   
-$\beta_{20g} = \gamma_{200} + u_{20g}$   
-$\beta_{21g} = \gamma_{210} + u_{21g}$   
-$\beta_{30g} = \gamma_{300} + u_{30g}$   
-$\beta_{31g} = \gamma_{310} + u_{31g}$
-
-```{r integrated_accuracy_x_p2_ext_sam}
-integrated_accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + pos + p2_ext_cent +
-                               p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:pos +
-                               (1 + self_norm + self_dist + p2_ext_cent +
-                                  p2_ext_cent:self_norm + 
-                                  p2_ext_cent:self_dist + p2_ext_cent:pos | 
-                                  sess_id/triad_id),
-                             data = integrated_profiles)
-summary(integrated_accuracy_sam_p2_ext)
-```
-
-```{r integrated_accuracy_sam_p2_ext_tbl, cache = FALSE}
-integrated_accuracy_sam_p2_ext %>% 
-  fixed_coefs_tbl()
-```
-
-```{r integrated_accuracy_sam_p2_ext_rfx_tbl, cache = FALSE}
-integrated_accuracy_sam_p2_ext %>% 
-  random_coefs_tbl()
-```
-
-## Empathy Moderators
 
 ### Empathy Moderating Consensus
 #### Distress moderating Hearsay consensus
@@ -2695,7 +1102,7 @@ integrated_consensus_sam_fantasy %>%
   random_coefs_tbl()
 ```
 
-### Perspective Taking moderating Hearsay consensus
+#### Perspective Taking moderating Hearsay consensus
 $P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeP1_{i} + \pi_{1tg}DistinctiveP1_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
 
 #### Level 2 Equation: 
@@ -2733,6 +1140,125 @@ integrated_consensus_sam_perspective %>%
 
 ```{r integrated_consensus_sam_perspective_rfx_tbl, cache = FALSE}
 integrated_consensus_sam_perspective %>% 
+  random_coefs_tbl()
+```
+
+### Extraversion Moderating Hearsay Accuracy
+#### Target Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
+
+##### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}targetExtraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}targetExtraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}targetExtraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}targetExtraversion_{tg} + r_{2tg}$    
+
+##### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r integrated_accuracy_x_target_ext_sam}
+integrated_accuracy_sam_t_ext <- lmer(p2 ~ self_norm + self_dist + pos + t_ext_cent +
+                               t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:pos +
+                               (1 + self_norm + self_dist + t_ext_cent +
+                                  t_ext_cent:self_norm + t_ext_cent:self_dist + t_ext_cent:pos | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(integrated_accuracy_sam_t_ext)
+```
+
+```{r integrated_accuracy_sam_t_ext_tbl, cache = FALSE}
+integrated_accuracy_sam_t_ext %>% 
+  fixed_coefs_tbl()
+```
+
+```{r integrated_accuracy_sam_t_ext_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_t_ext %>% 
+  random_coefs_tbl()
+```
+
+#### P1 Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P1Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P1Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P1Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P1Extraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r integrated_accuracy_x_p1_ext_sam}
+integrated_accuracy_sam_p1_ext <- lmer(p2 ~ self_norm + self_dist + pos + p1_ext_cent +
+                               p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:pos +
+                               (1 + self_norm + self_dist + p1_ext_cent +
+                                  p1_ext_cent:self_norm + p1_ext_cent:self_dist + p1_ext_cent:pos | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(integrated_accuracy_sam_p1_ext)
+```
+
+```{r integrated_accuracy_sam_p1_ext_tbl, cache = FALSE}
+integrated_accuracy_sam_p1_ext %>% 
+  fixed_coefs_tbl()
+```
+
+```{r integrated_accuracy_sam_p1_ext_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_p1_ext %>% 
+  random_coefs_tbl()
+```
+
+#### P2 Extraversion moderating Hearsay Accuracy
+$P2_{itg} = \pi_{0tg} +  \pi_{2tg}NormativeSelf_{i} + \pi_{1tg}DistinctiveSelf_{it} + \pi_{3tg}Positivity_{i} + \epsilon_{itg}$
+
+#### Level 2 Equation: 
+$\pi_{0tg} = \beta_{00g} + \beta_{01g}P2Extraversion_{tg} + r_{0tg}$   
+$\pi_{1tg} = \beta_{10g} + \beta_{11g}P2Extraversion_{tg} + r_{1tg}$   
+$\pi_{2tg} = \beta_{20g} + \beta_{21g}P2Extraversion_{tg} + r_{2tg}$   
+$\pi_{3tg} = \beta_{30g} + \beta_{31g}P2Extraversion_{tg} + r_{2tg}$    
+
+#### Level 3 Equation:
+$\beta_{00g} = \gamma_{000} + u_{00g}$   
+$\beta_{01g} = \gamma_{010} + u_{01g}$   
+$\beta_{10g} = \gamma_{100} + u_{10g}$   
+$\beta_{11g} = \gamma_{110} + u_{11g}$   
+$\beta_{20g} = \gamma_{200} + u_{20g}$   
+$\beta_{21g} = \gamma_{210} + u_{21g}$   
+$\beta_{30g} = \gamma_{300} + u_{30g}$   
+$\beta_{31g} = \gamma_{310} + u_{31g}$
+
+```{r integrated_accuracy_x_p2_ext_sam}
+integrated_accuracy_sam_p2_ext <- lmer(p2 ~ self_norm + self_dist + pos + p2_ext_cent +
+                               p2_ext_cent:self_norm + p2_ext_cent:self_dist + p2_ext_cent:pos +
+                               (1 + self_norm + self_dist + p2_ext_cent +
+                                  p2_ext_cent:self_norm + 
+                                  p2_ext_cent:self_dist + p2_ext_cent:pos | 
+                                  sess_id/triad_id),
+                             data = integrated_profiles)
+summary(integrated_accuracy_sam_p2_ext)
+```
+
+```{r integrated_accuracy_sam_p2_ext_tbl, cache = FALSE}
+integrated_accuracy_sam_p2_ext %>% 
+  fixed_coefs_tbl()
+```
+
+```{r integrated_accuracy_sam_p2_ext_rfx_tbl, cache = FALSE}
+integrated_accuracy_sam_p2_ext %>% 
   random_coefs_tbl()
 ```
 
@@ -2900,3 +1426,1207 @@ integrated_accuracy_sam_perspective %>%
 integrated_accuracy_sam_perspective %>% 
   random_coefs_tbl()
 ```
+
+# Domain-wise correlations
+## Combine (scored) wide study 1 and study 2 dataframes 
+```{r}
+study1 <- study1 %>% 
+  mutate(study = "study 1")
+study2 <- study2 %>% 
+  mutate(study = "study 2")
+# combine data
+integrated <- study2 %>% 
+  # Remove vars exclusive Study 2
+  .[, colnames(.) %in% colnames(study1)] %>% 
+  rbind(study1) %>% 
+  select(study, sess_id, everything()) %>% 
+  arrange(study)
+```
+
+## Model Comparisons to Assess Justifiability of Pooling across Studies
+
+### Agreeableness
+```{r agree_integrated_models}
+agree_integrated_noeq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_agreeableness", "C_A_agreeableness"),
+                                        p2_reports = c("B_C_agreeableness", "D_A_agreeableness"),
+                                        target_self = c("C_C_agreeableness", "A_A_agreeableness"),
+                                        group_mod = "study",
+                                        groups_eql = "none",
+                                        params_eql = "none",
+                                        use_labs = TRUE)
+
+agree_integrated_alleq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_agreeableness", "C_A_agreeableness"),
+                                        p2_reports = c("B_C_agreeableness", "D_A_agreeableness"),
+                                        target_self = c("C_C_agreeableness", "A_A_agreeableness"),
+                                        group_mod = "study",
+                                        groups_eql = "all",
+                                        params_eql = "all",
+                                        use_labs = TRUE)
+
+int_model_comp_agree <- anova(agree_integrated_noeq,
+                              agree_integrated_alleq)
+```
+
+### Conscientiousness
+```{r consc_integrated_models}
+consc_integrated_noeq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_conscientiousness", "C_A_conscientiousness"),
+                                        p2_reports = c("B_C_conscientiousness", "D_A_conscientiousness"),
+                                        target_self = c("C_C_conscientiousness", "A_A_conscientiousness"),
+                                        group_mod = "study",
+                                        groups_eql = "none",
+                                        params_eql = "none",
+                                        use_labs = TRUE)
+
+consc_integrated_alleq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_conscientiousness", "C_A_conscientiousness"),
+                                        p2_reports = c("B_C_conscientiousness", "D_A_conscientiousness"),
+                                        target_self = c("C_C_conscientiousness", "A_A_conscientiousness"),
+                                        group_mod = "study",
+                                        groups_eql = "all",
+                                        params_eql = "all",
+                                        use_labs = TRUE)
+int_model_comp_consc <- anova(consc_integrated_noeq,
+                              consc_integrated_alleq)
+```
+
+### Honesty-Propriety
+```{r hp_integrated_models}
+hp_integrated_noeq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_hp", "C_A_hp"),
+                                        p2_reports = c("B_C_hp", "D_A_hp"),
+                                        target_self = c("C_C_hp", "A_A_hp"),
+                                        group_mod = "study",
+                                        groups_eql = "none",
+                                        params_eql = "none",
+                                        use_labs = TRUE)
+
+hp_integrated_alleq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_hp", "C_A_hp"),
+                                        p2_reports = c("B_C_hp", "D_A_hp"),
+                                        target_self = c("C_C_hp", "A_A_hp"),
+                                        group_mod = "study",
+                                        groups_eql = "all",
+                                        params_eql = "all",
+                                        use_labs = TRUE)
+
+int_model_comp_hp <- anova(hp_integrated_noeq,
+                           hp_integrated_alleq)
+```
+
+### Neuroticism
+```{r neuro_integrated_models}
+neuro_integrated_noeq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_neuroticism", "C_A_neuroticism"),
+                                        p2_reports = c("B_C_neuroticism", "D_A_neuroticism"),
+                                        target_self = c("C_C_neuroticism", "A_A_neuroticism"),
+                                        group_mod = "study",
+                                        groups_eql = "none",
+                                        params_eql = "none",
+                                        use_labs = TRUE)
+
+neuro_integrated_alleq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_neuroticism", "C_A_neuroticism"),
+                                        p2_reports = c("B_C_neuroticism", "D_A_neuroticism"),
+                                        target_self = c("C_C_neuroticism", "A_A_neuroticism"),
+                                        group_mod = "study",
+                                        groups_eql = "all",
+                                        params_eql = "all",
+                                        use_labs = TRUE)
+
+int_model_comp_neuro <- anova(neuro_integrated_noeq,
+                              neuro_integrated_alleq)
+```
+
+### Extraversion
+```{r extra_integrated_models}
+extra_integrated_noeq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "study",
+                                        groups_eql = "none",
+                                        params_eql = "none",
+                                        use_labs = TRUE)
+
+extra_integrated_alleq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "study",
+                                        groups_eql = "all",
+                                        params_eql = "all",
+                                        use_labs = TRUE)
+int_model_comp_extra <- anova(extra_integrated_noeq,
+                              extra_integrated_alleq)
+```
+
+### Openness
+```{r open_integrated_models}
+open_integrated_noeq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_openness", "C_A_openness"),
+                                        p2_reports = c("B_C_openness", "D_A_openness"),
+                                        target_self = c("C_C_openness", "A_A_openness"),
+                                        group_mod = "study",
+                                        groups_eql = "none",
+                                        params_eql = "none",
+                                        use_labs = TRUE)
+
+open_integrated_alleq <- rep_auto_group_mod(integrated, 
+                                        p1_reports = c("A_C_openness", "C_A_openness"),
+                                        p2_reports = c("B_C_openness", "D_A_openness"),
+                                        target_self = c("C_C_openness", "A_A_openness"),
+                                        group_mod = "study",
+                                        groups_eql = "all",
+                                        params_eql = "all",
+                                        use_labs = TRUE)
+
+int_model_comp_open <- anova(open_integrated_noeq,
+                             open_integrated_alleq)
+```
+
+### Table of Comparisons
+
+```{r integrated_model_comp_tbl}
+model_comp_domains <- ls()[str_detect(ls(), "int_model_comp")] %>% 
+  str_split("_") %>% 
+  sapply(., function(df, position){df[position]}, 4)
+
+ls()[str_detect(ls(), "int_model_comp")] %>% 
+  lapply(FUN = get) %>%
+  map(mutate, delt_aic = AIC - lag(AIC) ,
+         delt_bic = BIC - lag(BIC) ) %>% 
+  map_df(slice, -1) %>% 
+  rename(pvalue = `Pr(>Chisq)`) %>% 
+  mutate(pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), "0.", "."), 4, side = "right", pad ="0"),  
+                         "< .001"),
+         domain = model_comp_domains,
+         domain = case_when(domain == "agree" ~ "Agreeableness",
+                            domain == "consc" ~ "Conscientiousness",
+                            domain == "hp" ~ "Honesty-Propriety",
+                            domain == "neuro" ~ "Neuroticism",
+                            domain == "extra" ~ "Extraversion",
+                            domain == "open" ~ "Openness"),
+         domain = fct_relevel(domain,
+                              "Agreeableness",
+                              "Conscientiousness",
+                              "Honesty-Propriety",
+                              "Neuroticism",
+                              "Extraversion",
+                              "Openness")) %>% 
+  arrange(domain) %>% 
+  select(domain, `Df diff`, `Chisq diff`, pvalue, delt_aic, delt_bic) %>% 
+  knitr::kable(caption = "Model Comparison Results for Integrating across Studies",
+               digits = c(NA, 0, 2, 3, 2, 2),
+               format = "html", escape = FALSE) %>% 
+  kable_styling("striped", full_width = F)
+  
+```
+
+##  Study 2 & Integrated differential hearsay consensus, accuracy, and direct accuracy
+
+```{r int_diff_results}
+# get names of models
+int_model_names <- ls()[str_detect(ls(), "integrated_[:alpha:]*eq$")]
+
+int_diff_results <- 
+  int_model_names %>% 
+  map(get) %>%
+  map(ez_differential_group_table) %>% 
+  enframe() %>% 
+  mutate(name = int_model_names) %>% 
+  unnest() %>% 
+  separate(name, c("domain", "temp1", "temp2")) %>% 
+  select(-temp1, -temp2) %>% 
+  mutate(domain = case_when(domain == "agree" ~ "Agreeableness",
+                            domain == "consc" ~ "Conscientiousness",
+                            domain == "hp" ~ "Honesty-Propriety",
+                            domain == "neuro" ~ "Neuroticism",
+                            domain == "extra" ~ "Extraversion",
+                            domain == "open" ~ "Openness")) %>% 
+    mutate(study = case_when(
+      is.na(group_label) ~ "Integrated",
+      group_label == "grp1" ~ "Study 1",
+      group_label == "grp2" ~ "Study 2"),
+      domain = fct_relevel(domain, 
+                       "Agreeableness",
+                       "Conscientiousness",
+                       "Honesty-Propriety",
+                       "Neuroticism",
+                       "Extraversion",
+                       "Openness"),
+      study = fct_relevel(study,
+                          "Study 1",
+                          "Study 2",
+                          "Integrated"),
+      parameter = fct_relevel(parameter,
+                              "hearsay consensus",
+                              "hearsay accuracy",
+                              "direct accuracy")) %>% 
+    select(study, parameter, domain, everything(), -group_label)
+```
+
+### Table of Study 2 & Integrated Differential Results
+```{r int_diff_results_tbl}
+int_diff_results %>% 
+  mutate(r = round(r, 2),
+         r = ifelse(str_detect(r, "\\..$"), paste0(r, "0"), 
+                    ifelse(str_detect(r, "^0$"), paste0(r, ".00"), r)),
+         r = cell_spec(r, "html", 
+                             bold = ifelse(ci_lower > 0, TRUE, FALSE)),
+         ci_lower = round(ci_lower, 2),
+         ci_lower = ifelse(str_detect(ci_lower, "\\..$"), paste0(ci_lower, "0"), 
+                    ifelse(str_detect(ci_lower, "^0$"), paste0(ci_lower, ".00"), ci_lower)),
+         ci_lower = cell_spec(ci_lower, "html", 
+                             bold = ifelse(ci_lower > 0, TRUE, FALSE)),
+         ci_upper = round(ci_upper, 2),
+         ci_upper = ifelse(str_detect(ci_upper, "\\..$"), paste0(ci_upper, "0"), 
+                    ifelse(str_detect(ci_upper, "^0$"), paste0(ci_upper, ".00"), ci_upper)),
+         ci_upper = cell_spec(ci_upper, "html",
+                             bold = ifelse(pvalue == "< .001", TRUE,
+                                    ifelse(as.numeric(pvalue) < .05, TRUE, FALSE))),
+         pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), "0.", "."), 4, side = "right", pad ="0"),  
+                         "< .001")) %>% 
+  arrange(desc(study), parameter, domain) %>% 
+  filter(study != "Study 1") %>% 
+  select(-study) %>% 
+  knitr::kable(caption = "Study 2 & Integrated Differrntial Consensus & Accuracy Results",
+              format = "html", escape = F) %>% 
+  kable_styling("striped", full_width = F) %>% 
+  pack_rows("Integrated", 1, 18) %>% 
+  pack_rows("Study 2", 19, 36)
+```
+
+Next, I'll set the theme I use in the manuscript.
+```{r plot_theme}
+# Custom theme for the reputation manuscript
+theme_rep_manuscript <-  theme(panel.background = element_blank(),
+                         panel.grid.major.x = element_line(size=.4, color="gray90"))+
+  theme(axis.line.x = element_line(color="black", size = 1),
+        axis.line.y = element_line(color="black", size = 1))+
+  theme(axis.title = element_text(size = rel(1), color="black"), 
+        axis.text = element_text(size = rel(1), color="black"))+
+  theme(plot.title= element_text(size=rel(1), hjust = .5))
+
+```
+
+Then set up the plot data:
+
+```{r int_diff_results_plot_data}
+int_diff_plot_data <- as_tibble(cbind(domain = c("Agreeableness",
+                                                 "Conscientiousness",
+                                                 "Honesty-Propriety",
+                                                 "Neuroticism",
+                                                 "Extraversion",
+                                                 "Openness"),
+  # Connelly & Ones (2010) inter-rater r
+  co2010_irr = c(.31, .35, NA, .32, .50, .29),
+  # Connelly & Ones (2010) self-other agreement
+  co2010_soa_1 = c(.09, .13, NA, .08, .22, .12),
+  # Connelly & Ones (2010) self-other agreement again
+  # since we'll use it for direct and hearsay accuracy
+  co2010_soa_2 = c(.09, .13, NA, .08, .22, .12))) %>% 
+  gather(source, r, -domain) %>% 
+  mutate(parameter = 
+           case_when(source == "co2010_irr" ~ "Hearsay Consensus",
+                     source == "co2010_soa_1" ~ "Hearsay Accuracy",
+                     source == "co2010_soa_2" ~ "Direct Accuracy"),
+         source = str_replace_all(source, 
+                                  "co2010_irr", 
+                                  "Connelly & Ones (2010) Study 1"),
+         source = str_replace_all(source, 
+                                  "co2010_soa_1", 
+                                  "Connelly & Ones (2010) Study 2"),
+         source = str_replace_all(source, 
+                                  "co2010_soa_2", 
+                                  "Connelly & Ones (2010) Study 2"),
+         r = as.double(r),
+         # To make plotting easier, I'm going to make two
+         # variables ci.lower and ci.upper (to match the structure of our estimates)
+         # and I'll make them equal to the point estimate (since that is all we have for
+         # uncorrected estimates).
+         ci_lower = r,
+         ci_upper = r) %>% 
+  full_join(mutate(int_diff_results,
+                   parameter = str_to_title(parameter),
+                   source = study)) %>%
+  select(-study) %>% 
+  # Re-level to have plots in the order we want them in
+  mutate(domain = fct_relevel(factor(domain),
+                              "Openness",
+                              "Extraversion",
+                              "Neuroticism",
+                              "Honesty-Propriety",
+                              "Conscientiousness",
+                              "Agreeableness"),
+         focus = ifelse(source == "Integrated", "low", "high"),
+         source = fct_relevel(source, 
+                              "Connelly & Ones (2010) Study 1",
+                              "Connelly & Ones (2010) Study 2",
+                              "Integrated",
+                              "Study 2",
+                              "Study 1"))
+```
+
+
+Finally, this writes out thed individual plots (Figure 3, 4, and S1) to a folder called 'plots' in the current directory. I'll also make a 3-panelled plot, which contains Figures 8, 9, and S4 all in one plot for the markdown.
+```{r int_making_plots4MS_and_ppt, fig.height=11, fig.width=12}
+plot_names <- c(1:3)
+i <- 1
+for (each in unique(int_diff_plot_data$parameter)){
+  i <- i + 1
+  plot_name <- paste("plot", i, sep = "_")
+  plot_names[i] <- plot_name
+  plot_data <- filter(int_diff_plot_data, parameter == each)
+  assign(plot_name, ggplot(data = plot_data, 
+                 aes(x = domain, y = r, shape = source, alpha = focus)) + 
+  geom_pointrange(aes(ymin = ci_lower, ymax = ci_upper),
+                  position = position_dodge(width = 1),
+                  size = 1) + 
+  labs(title = NULL,
+       x = NULL,
+       y = "r") +
+  theme_rep_manuscript +
+  geom_hline(yintercept = 0, linetype = 2, alpha = .5) + 
+    scale_y_continuous(limit=c(-0.3, .80))+
+    scale_alpha_discrete(range = c(.3, 1)) +
+  coord_flip()+
+  guides(shape = guide_legend(reverse = TRUE),
+         alpha = FALSE) +
+  scale_shape_manual(values = c(16,12, 0, 3)))
+  ggsave(paste0("Plots/Integrated_", print(each), ".png"), get(plot_name),
+         device = "png", height = 5, width = 9.5)
+  ggsave(paste0("Plots/Integrated_", print(each), "_4ppt.png"), get(plot_name),
+         device = "png", height = 5, width = 9.5, scale = .80)
+}
+
+plot_names <- plot_names[str_detect(plot_names, "^plot")]
+cowplot::plot_grid(get(plot_names[1]), get(plot_names[2]),
+                   get(plot_names[3]), nrow = 3,
+                   labels = c("Hearsay Consensus",
+                              "Hearsay Accuracy",
+                              "Direct Accuracy"), 
+                   label_y = 1.01,
+                   label_x = .06)
+```
+
+# Context Manipulation
+## Status-relevant context and extraversion
+
+First up, comparing hearsay consensus and accuracy for Extraversion in the status vs. control conditions. 
+```{r status_extraversion_models}
+extra_status_noeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "condition",
+                                        groups_eql = "none",
+                                        params_eql = "none",
+                                        use_labs = TRUE)
+
+extra_status_hceq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "condition",
+                                        groups_eql = 2:3,
+                                        params_eql = "hc",
+                                        use_labs = TRUE)
+
+extra_status_haeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "condition",
+                                        groups_eql = 2:3,
+                                        params_eql = c("ha"),
+                                        use_labs = TRUE)
+
+extra_status_daeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_extraversion", "C_A_extraversion"),
+                                        p2_reports = c("B_C_extraversion", "D_A_extraversion"),
+                                        target_self = c("C_C_extraversion", "A_A_extraversion"),
+                                        group_mod = "condition",
+                                        groups_eql = 2:3,
+                                        params_eql = c("da"),
+                                        use_labs = TRUE)
+```
+
+### Table of Model Comparison For Extraversion across Conditions
+```{r extra_status_model_comp_tbl}
+extra_status_models <- c("extra_status_hceq", 
+                         "extra_status_haeq", 
+                         "extra_status_daeq") 
+extra_status_models %>% 
+  map(get) %>% 
+  map(anova, extra_status_noeq) %>% 
+  map(as.data.frame) %>% 
+  map(mutate, delt_aic = AIC - lag(AIC) ,
+         delt_bic = BIC - lag(BIC)) %>% 
+  map_df(slice, -1) %>% 
+  cbind(comparison = c("Hearsay Consensus Equal",
+                       "Hearsay Accuracy Equal",
+                       "Direct Accuracy Equal")) %>% 
+  select(comparison, 5:9) %>% 
+  rename(pvalue = `Pr(>Chisq)`) %>% 
+  mutate(comparison = as.character(comparison),
+         comparison = ifelse(comparison == "Direct Accuracy Equal", 
+                             paste0(comparison, footnote_marker_alphabet(1)), comparison),
+         pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), 
+                                             "0.", "."), 4, 
+                                 side = "right", pad ="0"),  
+                         "< .001")) %>% 
+  knitr::kable(caption = "Model Comparison Results for Status-Relevant Context and Extraversion",
+               digits = c(NA, 2, 0, NA, 2, 2),
+               format = "html", escape = FALSE) %>% 
+  kable_styling("striped", full_width = F) %>% 
+  footnote(general = "Each Model is Compared to the Null Model",
+           alphabet = "not pre-registered")
+```
+### Table of Differential Agreement for Extraversion by Condition
+```{r differential_extraversion_by_condition}
+ez_differential_group_table(extra_status_noeq) %>%
+  mutate(condition = case_when(
+  group_label == "grp1" ~ "Affiliation",
+  group_label == "grp2" ~ "Neutral/Control",
+  group_label == "grp3" ~ "Status"
+  ),
+  pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), "0.", "."), 4, 
+                                 side = "right", pad ="0"),  
+                         "< .001")) %>% 
+  select(condition, everything(), -group_label) %>% 
+  knitr::kable(caption = "Differential Results for Extraversion Across Condition",
+               digits = c(NA, NA, 2, 2, 2, 3),
+               format = "html", escape = FALSE) %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+### Plot of Hearsay Consensus & Accuracy for Extraversion in the Status vs. Control Conditions (Figure 5)
+```{r differential_extraversion_by_condition_plot}
+extra_status_plot <- ez_differential_group_table(extra_status_noeq) %>%
+  mutate(condition = case_when(group_label == "grp1" ~ "Affiliation",
+  group_label == "grp2" ~ "Neutral/Control",
+  group_label == "grp3" ~ "Status")) %>% 
+  filter(condition != "Affiliation") %>% 
+  ggplot(aes(x = parameter, y = r, shape = condition)) +
+  geom_pointrange(aes(ymin = ci_lower, ymax = ci_upper), position = position_dodge(width = .5)) + 
+  theme_rep_manuscript +
+  geom_hline(yintercept = 0, linetype = 2, alpha = .5) + 
+  scale_y_continuous(limit=c(-0.3, .95))+
+  coord_flip()+
+  guides(shape=guide_legend(reverse=TRUE)) +
+  labs(x = NULL)
+extra_status_plot
+ggsave("Plots/extraXCond.png",
+       extra_status_plot,
+       device = "png", height = 5, width = 9.5)
+```
+## Affiliation-relevant context and agreeableness
+
+Next up, comparing hearsay consensus and accuracy for Agreeableness in the affiliation vs. control conditions.
+
+```{r affil_agree_models}
+agree_affil_noeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_agreeableness", "C_A_agreeableness"),
+                                        p2_reports = c("B_C_agreeableness", "D_A_agreeableness"),
+                                        target_self = c("C_C_agreeableness", "A_A_agreeableness"),
+                                        group_mod = "condition",
+                                        groups_eql = "none",
+                                        params_eql = "none",
+                                        use_labs = TRUE)
+
+agree_affil_hceq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_agreeableness", "C_A_agreeableness"),
+                                        p2_reports = c("B_C_agreeableness", "D_A_agreeableness"),
+                                        target_self = c("C_C_agreeableness", "A_A_agreeableness"),
+                                        group_mod = "condition",
+                                        groups_eql = 1:2,
+                                        params_eql = "hc",
+                                        use_labs = TRUE)
+
+agree_affil_haeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_agreeableness", "C_A_agreeableness"),
+                                        p2_reports = c("B_C_agreeableness", "D_A_agreeableness"),
+                                        target_self = c("C_C_agreeableness", "A_A_agreeableness"),
+                                        group_mod = "condition",
+                                        groups_eql = 1:2,
+                                        params_eql = c("ha"),
+                                        use_labs = TRUE)
+
+agree_affil_daeq <- rep_auto_group_mod(study2, 
+                                        p1_reports = c("A_C_agreeableness", "C_A_agreeableness"),
+                                        p2_reports = c("B_C_agreeableness", "D_A_agreeableness"),
+                                        target_self = c("C_C_agreeableness", "A_A_agreeableness"),
+                                        group_mod = "condition",
+                                        groups_eql = 1:2,
+                                        params_eql = c("da"),
+                                        use_labs = TRUE)
+```
+### Table of Model Comparison For Agreeableness across Conditions
+```{r agree_affil_model_comp_tbl}
+agree_affil_models <- c("agree_affil_hceq", 
+                         "agree_affil_haeq", 
+                         "agree_affil_daeq") 
+agree_affil_models %>% 
+  map(get) %>% 
+  map(anova, agree_affil_noeq) %>% 
+  map(as.data.frame) %>% 
+  map(mutate, delt_aic = AIC - lag(AIC) ,
+         delt_bic = BIC - lag(BIC)) %>% 
+  map_df(slice, -1) %>% 
+  cbind(comparison = c("Hearsay Consensus Equal",
+                       "Hearsay Accuracy Equal",
+                       "Direct Accuracy Equal")) %>% 
+  select(comparison, 5:9) %>% 
+  rename(pvalue = `Pr(>Chisq)`) %>% 
+  mutate(comparison = as.character(comparison),
+         comparison = ifelse(comparison == "Direct Accuracy Equal", 
+                             paste0(comparison, footnote_marker_alphabet(1)), comparison),
+         pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), 
+                                             "0.", "."), 4, 
+                                 side = "right", pad ="0"),  
+                         "< .001")) %>% 
+  knitr::kable(caption = "Model Comparison Results for Affiliation-Relevant Context and Agreeableness",
+               digits = c(NA, 2, 0, NA, 2, 2),
+               format = "html", escape = FALSE) %>% 
+  kable_styling("striped", full_width = F) %>% 
+  footnote(general = "Each Model is Compared to the Null Model",
+           alphabet = "not pre-registered")
+```
+
+### Table of Differential Agreement for Agreeableness by Condition
+
+```{r affil_agree_table}
+ez_differential_group_table(agree_affil_noeq) %>%
+  mutate(condition = case_when(
+  group_label == "grp1" ~ "Affiliation",
+  group_label == "grp2" ~ "Neutral/Control",
+  group_label == "grp3" ~ "Status"
+  ),
+  pvalue = ifelse(pvalue >= .001, 
+                         str_pad(str_replace(round(pvalue, 3), "0.", "."), 4, 
+                                 side = "right", pad ="0"),  
+                         "< .001")) %>% 
+  select(condition, everything(), -group_label) %>% 
+  knitr::kable(caption = "Differential Results for Agreeableness Across Condition",
+               digits = c(NA, NA, 2, 2, 2, 3),
+               format = "html", escape = FALSE) %>% 
+  kable_styling("striped", full_width = F) 
+```
+
+### Plot of Hearsay Consensus & Accuracy for Agreeableness in the Status vs. Control Conditions (Figure 6)
+```{r differential_agreeableness_by_condition_plot}
+agree_affil_plot <- ez_differential_group_table(agree_affil_noeq) %>%
+  mutate(condition = case_when(group_label == "grp1" ~ "Affiliation",
+  group_label == "grp2" ~ "Neutral/Control",
+  group_label == "grp3" ~ "Status"),
+  condition = fct_relevel(condition, 
+                                 "Neutral/Control",
+                                 "Affiliation",
+                                 "Status")) %>% 
+  filter(condition != "Status") %>% 
+  ggplot(aes(x = parameter, y = r, shape = condition)) +
+  geom_pointrange(aes(ymin = ci_lower, ymax = ci_upper), position = position_dodge(width = .5)) + 
+  theme_rep_manuscript +
+  geom_hline(yintercept = 0, linetype = 2, alpha = .5) + 
+  scale_y_continuous(limit=c(-0.3, .95))+
+  coord_flip()+
+  guides(shape=guide_legend(reverse=TRUE)) +
+  labs(x = NULL)
+agree_affil_plot
+ggsave("Plots/agreeXCond.png",
+       agree_affil_plot,
+       device = "png", height = 5, width = 9.5)
+```
+
+# Consequences 
+
+## Effects of reputation on leadership judgments
+
+### Pre-registered Mediation Model: Extraversion to Leadership
+This is a pre-registerd analysis looking at whether P1's perception of thr target's Extraversion influences P2's perception of the target's Extraversion, which in turn influences their perception of the target's leadership potential. It was pre-registered as hypothesis 3 on OSF.
+
+```{r H3_path_model}
+extraversion_status_med_model_h3 <-'
+# Model for A-B-C triad
+B_C_contextitem_goodleader ~ b*B_C_extraversion + c*A_C_extraversion
+B_C_extraversion ~ a*A_C_extraversion
+
+# Model for C-D-A triad
+D_A_contextitem_goodleader ~ b*D_A_extraversion + c*C_A_extraversion
+D_A_extraversion ~ a*C_A_extraversion
+
+# variances
+B_C_contextitem_goodleader ~~ v_P2_gl*B_C_contextitem_goodleader
+D_A_contextitem_goodleader ~~ v_P2_gl*D_A_contextitem_goodleader
+B_C_extraversion ~~ v_P2*B_C_extraversion
+D_A_extraversion ~~ v_P2*D_A_extraversion
+A_C_extraversion ~~ v_P1*A_C_extraversion
+C_A_extraversion ~~ v_P1*C_A_extraversion
+
+# intercepts
+B_C_contextitem_goodleader ~ int_P2_gl*1
+D_A_contextitem_goodleader ~ int_P2_gl*1
+B_C_extraversion ~ int_P2*1
+D_A_extraversion ~ int_P2*1
+A_C_extraversion ~ int_P1*1
+C_A_extraversion ~ int_P1*1
+
+# indirect (mediated) effect
+indirecteffect := a*b
+'
+fit_extraversion_status_med_model_h3 <-sem(extraversion_status_med_model_h3, 
+                                            data = study2, 
+                                            missing="FIML", 
+                                            se="bootstrap", 
+                                            fixed.x=TRUE)
+
+summary(fit_extraversion_status_med_model_h3)
+```
+
+#### Table for Extraversion to Leadership Mediation model
+```{r extra_leader_med_model_tbl}
+parameterestimates(fit_extraversion_status_med_model_h3) %>%
+  as.data.frame() %>% 
+  filter(label == "a" |
+         label == "b" |
+         label == "c" |
+         label == "indirecteffect") %>% 
+  rename(ci_upper = ci.upper,
+         ci_lower = ci.lower) %>% 
+  mutate(parameter = case_when(label == "b" ~ "P2(T) Extraversion -> P2(T) Leadership",
+                              label == "c" ~ "P1(T) Extraversion -> P2(T) Leadership",
+                              label == "a" ~ "P1(T) Extraversion -> P2(T) Extraversion",
+                              label == "indirecteffect" ~ "Mediated Effect"),
+         label == fct_relevel(label,
+                             "a",
+                             "b",
+                             "c"),
+        pvalue = ifelse(pvalue >= .001, 
+                        str_pad(str_replace(round(pvalue, 3),
+                                            "0.", "."), 4, 
+                                side = "right", pad ="0"),  
+                        "< .001"),
+        est = round(est, 2),
+        est = ifelse(str_detect(est, "\\..$"), paste0(est, "0"), 
+                   ifelse(str_detect(est, "^0$"), paste0(est, ".00"), est)),
+        est = cell_spec(est, "html", 
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        ci_lower = round(ci_lower, 2),
+        ci_lower = ifelse(str_detect(ci_lower, "\\..$"), paste0(ci_lower, "0"), 
+                   ifelse(str_detect(ci_lower, "^0$"), paste0(ci_lower, ".00"), ci_lower)),
+        ci_lower = cell_spec(ci_lower, "html", 
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        ci_upper = round(ci_upper, 2),
+        ci_upper = ifelse(str_detect(ci_upper, "\\..$"), paste0(ci_upper, "0"), 
+                   ifelse(str_detect(ci_upper, "^0$"), paste0(ci_upper, ".00"), ci_upper)),
+        ci_upper = cell_spec(ci_upper, "html",
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        z = round(z, 2)) %>% 
+  arrange(label) %>% 
+  select(parameter, est, ci_lower, ci_upper, z, pvalue) %>% 
+  distinct() %>% 
+  knitr::kable(caption = "Extraversion and Leadership Mediation Results",
+              format = "html", escape = F) %>% 
+ kable_styling("striped", full_width = F) 
+  
+```
+
+
+Our results are consistent with our hypothesis: P2's perception of the target's leadership is infleunced by their perception of the target's Extraversion, which is in turn influenced by P1's perception of the target's Extraversion.
+
+### Additional Model: All Big Six and Leadership
+
+```{r h3_all6_leadership_multi_med_model}
+big6_status_multi_med_model_h3alt <-'
+# Model for A-B-C triad
+B_C_contextitem_goodleader ~ b1*B_C_extraversion + b2*B_C_agreeableness + b3*B_C_conscientiousness + b4*B_C_neuroticism + b5*B_C_openness + b6*B_C_hp + c1*A_C_extraversion + c2*A_C_agreeableness + c3*A_C_conscientiousness + c4*A_C_neuroticism + c5*A_C_openness + c6*A_C_hp 
+
+B_C_extraversion      ~ a1*A_C_extraversion
+B_C_agreeableness     ~ a2*A_C_agreeableness
+B_C_conscientiousness ~ a3*A_C_conscientiousness
+B_C_neuroticism       ~ a4*A_C_neuroticism
+B_C_openness          ~ a5*A_C_openness
+B_C_hp                ~ a6*A_C_hp
+
+# Model for C-D-A triad
+D_A_contextitem_goodleader ~ b1*D_A_extraversion + b2*D_A_agreeableness + b3*D_A_conscientiousness + b4*D_A_neuroticism + b5*D_A_openness + b6*D_A_hp + c1*C_A_extraversion + c2*C_A_agreeableness + c3*C_A_conscientiousness + c4*C_A_neuroticism + c5*C_A_openness + c6*C_A_hp 
+
+D_A_extraversion      ~ a1*C_A_extraversion
+D_A_agreeableness     ~ a2*C_A_agreeableness
+D_A_conscientiousness ~ a3*C_A_conscientiousness
+D_A_neuroticism       ~ a4*C_A_neuroticism
+D_A_openness          ~ a5*C_A_openness
+D_A_hp                ~ a6*C_A_hp
+
+# variances
+B_C_contextitem_goodleader ~~ v_P2_gl*B_C_contextitem_goodleader
+D_A_contextitem_goodleader ~~ v_P2_gl*D_A_contextitem_goodleader
+B_C_extraversion ~~ v_P2_ex*B_C_extraversion
+D_A_extraversion ~~ v_P2_ex*D_A_extraversion
+B_C_agreeableness ~~ v_P2_ag*B_C_agreeableness
+D_A_agreeableness ~~ v_P2_ag*D_A_agreeableness
+B_C_conscientiousness ~~ v_P2_co*B_C_conscientiousness
+D_A_conscientiousness ~~ v_P2_co*D_A_conscientiousness
+B_C_neuroticism ~~ v_P2_ne*B_C_neuroticism
+D_A_neuroticism ~~ v_P2_ne*D_A_neuroticism
+B_C_openness ~~ v_P2_op*B_C_openness
+D_A_openness ~~ v_P2_op*D_A_openness
+B_C_hp ~~ v_P2_hp*B_C_hp
+D_A_hp ~~ v_P2_hp*D_A_hp
+
+A_C_extraversion ~~ v_P1_ex*A_C_extraversion
+C_A_extraversion ~~ v_P1_ex*C_A_extraversion
+A_C_agreeableness ~~ v_P1_ag*A_C_agreeableness
+C_A_agreeableness ~~ v_P1_ag*C_A_agreeableness
+A_C_conscientiousness ~~ v_P1_co*A_C_conscientiousness
+C_A_conscientiousness ~~ v_P1_co*C_A_conscientiousness
+A_C_neuroticism ~~ v_P1_ne*A_C_neuroticism
+C_A_neuroticism ~~ v_P1_ne*C_A_neuroticism
+A_C_openness ~~ v_P1_op*A_C_openness
+C_A_openness ~~ v_P1_op*C_A_openness
+A_C_hp ~~ v_P1_hp*A_C_hp
+C_A_hp ~~ v_P1_hp*C_A_hp
+
+
+# intercepts
+
+B_C_contextitem_goodleader ~ int_P2_gl*1
+D_A_contextitem_goodleader ~ int_P2_gl*1
+B_C_extraversion ~ int_P2_ex*1
+D_A_extraversion ~ int_P2_ex*1
+B_C_agreeableness ~ int_P2_ag*1
+D_A_agreeableness ~ int_P2_ag*1
+B_C_conscientiousness ~ int_P2_co*1
+D_A_conscientiousness ~ int_P2_co*1
+B_C_neuroticism ~ int_P2_ne*1
+D_A_neuroticism ~ int_P2_ne*1
+B_C_openness ~ int_P2_op*1
+D_A_openness ~ int_P2_op*1
+B_C_hp ~ int_P2_hp*1
+D_A_hp ~ int_P2_hp*1
+
+A_C_extraversion ~ int_P1_ex*1
+C_A_extraversion ~ int_P1_ex*1
+A_C_agreeableness ~ int_P1_ag*1
+C_A_agreeableness ~ int_P1_ag*1
+A_C_conscientiousness ~ int_P1_co*1
+C_A_conscientiousness ~ int_P1_co*1
+A_C_neuroticism ~ int_P1_ne*1
+C_A_neuroticism ~ int_P1_ne*1
+A_C_openness ~ int_P1_op*1
+C_A_openness ~ int_P1_op*1
+A_C_hp ~ int_P1_hp*1
+C_A_hp ~ int_P1_hp*1
+
+
+# indirect (mediated) effect
+indirect_ex := a1*b1
+indirect_ag := a2*b2
+indirect_co := a3*b3
+indirect_ne := a4*b4
+indirect_op := a5*b5
+indirect_hp := a6*b6
+'
+fit_big6_status_multi_med_model_h3alt <-sem(big6_status_multi_med_model_h3alt, 
+                                            data = study2, 
+                                            missing = "FIML", 
+                                            se = "bootstrap", 
+                                            fixed.x = TRUE)
+
+summary(fit_big6_status_multi_med_model_h3alt)
+
+```
+
+#### Table for Big Six to Leadership Mediation model
+```{r bigsix_leader_med_model_tbl}
+parameterestimates(fit_big6_status_multi_med_model_h3alt) %>%
+  as.data.frame() %>% 
+  filter(str_detect(label, "^a") |
+         str_detect(label, "^b") |
+         str_detect(label, "^c") |
+         str_detect(label, "^indirect_")) %>% 
+  rename(ci_upper = ci.upper,
+         ci_lower = ci.lower) %>% 
+  mutate(parameter = case_when(
+    label == "a1" ~ "P1(T) Extraversion -> P2(T) Extraversion",
+    label == "a2" ~ "P1(T) Agreeableness -> P2(T) Agreeableness",
+    label == "a3" ~ "P1(T) Conscientiousness -> P2(T) Conscientiousness",
+    label == "a4" ~ "P1(T) Neuroticism -> P2(T) Neuroticism",
+    label == "a5" ~ "P1(T) Openness -> P2(T) Openness",
+    label == "a6" ~ "P1(T) Honesty-Propriety -> P2(T) Honesty-Propriety",
+    label == "b1" ~ "P2(T) Extraversion -> P2(T) Leadership",
+    label == "b2" ~ "P2(T) Agreeableness -> P2(T) Leadership",
+    label == "b3" ~ "P2(T) Conscientiousness -> P2(T) Leadership",
+    label == "b4" ~ "P2(T) Neuroticism -> P2(T) Leadership",
+    label == "b5" ~ "P2(T) Openness -> P2(T) Leadership",
+    label == "b6" ~ "P2(T) Honesty-Propriety -> P2(T) Leadership",
+    label == "c1" ~ "P1(T) Extraversion -> P2(T) Leadership",
+    label == "c2" ~ "P1(T) Agreeableness -> P2(T) Leadership",
+    label == "c3" ~ "P1(T) Conscientiousness -> P2(T) Leadership",
+    label == "c4" ~ "P1(T) Neuroticism -> P2(T) Leadership",
+    label == "c5" ~ "P1(T) Openness -> P2(T) Leadership",
+    label == "c6" ~ "P1(T) Honesty-Propriety -> P2(T) Leadership",
+    label == "indirect_ex" ~ "Indirect Extraversion",
+    label == "indirect_ag" ~ "Indirect Agreeableness",
+    label == "indirect_co" ~ "Indirect Conscientiousness",
+    label == "indirect_ne" ~ "Indirect Neuroticism",
+    label == "indirect_op" ~ "Indirect Openness ",
+    label == "indirect_hp" ~ "Indirect Honesty-Propriety"),
+    label = fct_relevel(label,
+                             "a1",
+                             "a2",
+                             "a3",
+                             "a4",
+                             "a5",
+                             "a6",
+                             "b1",
+                             "b2",
+                             "b3",
+                             "b4",
+                             "b5",
+                             "b6",
+                             "c1",
+                             "c2",
+                             "c3",
+                             "c4",
+                             "c5",
+                             "c6",
+                             "indirect_ex",
+                             "indirect_ag",
+                             "indirect_co",
+                             "indirect_ne",
+                             "indirect_op",
+                             "indirect_hp"),
+        pvalue = ifelse(pvalue >= .001, 
+                        str_pad(str_replace(round(pvalue, 3),
+                                            "0.", "."), 4, 
+                                side = "right", pad ="0"),  
+                        "< .001"),
+        est = round(est, 2),
+        est = ifelse(str_detect(est, "\\..$"), paste0(est, "0"), 
+                   ifelse(str_detect(est, "^0$"), paste0(est, ".00"), est)),
+        est = cell_spec(est, "html", 
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        ci_lower = round(ci_lower, 2),
+        ci_lower = ifelse(str_detect(ci_lower, "\\..$"), paste0(ci_lower, "0"), 
+                   ifelse(str_detect(ci_lower, "^0$"), paste0(ci_lower, ".00"), ci_lower)),
+        ci_lower = cell_spec(ci_lower, "html", 
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        ci_upper = round(ci_upper, 2),
+        ci_upper = ifelse(str_detect(ci_upper, "\\..$"), paste0(ci_upper, "0"), 
+                   ifelse(str_detect(ci_upper, "^0$"), paste0(ci_upper, ".00"), ci_upper)),
+        ci_upper = cell_spec(ci_upper, "html",
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        z = round(z, 2)) %>% 
+  arrange(label) %>% 
+  select(parameter, est, ci_lower, ci_upper, z, pvalue) %>% 
+  distinct() %>% 
+  knitr::kable(caption = "All Big Six and Leadership Mediation Results",
+              format = "html", escape = F) %>% 
+ kable_styling("striped", full_width = F) %>% 
+ pack_rows("Hearsay Consensus Path", 1, 6) %>% 
+ pack_rows("Hearsay Reputations of Big Six to Leadership", 7, 12) %>% 
+ pack_rows("Direct Reputations of Big Six to Hearsay Reputations of Leadership", 13, 18) %>% 
+ pack_rows("Indirect (Mediated) Effects", 19, 24)
+```
+Looks like the b paths (P2(T) trait -> P2(T) leadership) and the indirect effects are significant for Extraversion, Conscientiousness, and Openness. Suggests that P2's perception of T's leadership is determined by how Extraverted, Agreeable, and Conscientious they think T is, which in turn is affected by P1's perception of T on those dimensions.
+
+## Effects of reputation on friendship judgments.
+
+### Pre-Registered Mediation Model: Agreeableness to Friendship
+
+This is a pre-registerd analysis looking at whether P1's perception of thr target's Agreeableness influences P2's perception of the target's Agreeableness, which in turn influences their perception of the target's friendship potential. It was pre-registered as hypothesis 4 on OSF.
+
+```{r H4_path_model}
+agreeableness_affil_med_model_h4 <-'
+# Model for A-B-C triad
+B_C_contextitem_goodfriend ~ b*B_C_agreeableness + c*A_C_agreeableness
+B_C_agreeableness ~ a*A_C_agreeableness
+
+# Model for C-D-A triad
+D_A_contextitem_goodfriend ~ b*D_A_agreeableness + c*C_A_agreeableness
+D_A_agreeableness ~ a*C_A_agreeableness
+
+# variances
+B_C_contextitem_goodfriend ~~ v_P2_gl*B_C_contextitem_goodfriend
+D_A_contextitem_goodfriend ~~ v_P2_gl*D_A_contextitem_goodfriend
+B_C_agreeableness ~~ v_P2*B_C_agreeableness
+D_A_agreeableness ~~ v_P2*D_A_agreeableness
+A_C_agreeableness ~~ v_P1*A_C_agreeableness
+C_A_agreeableness ~~ v_P1*C_A_agreeableness
+
+# intercepts
+B_C_contextitem_goodfriend ~ int_P2_gl*1
+D_A_contextitem_goodfriend ~ int_P2_gl*1
+B_C_agreeableness ~ int_P2*1
+D_A_agreeableness ~ int_P2*1
+A_C_agreeableness ~ int_P1*1
+C_A_agreeableness ~ int_P1*1
+
+# indirect (mediated) effect
+indirecteffect := a*b
+'
+fit_agreeableness_affil_med_model_h4 <-sem(agreeableness_affil_med_model_h4, 
+                                            data = study2, 
+                                            missing="FIML", 
+                                            se="bootstrap", 
+                                            fixed.x=TRUE)
+
+summary(fit_agreeableness_affil_med_model_h4)
+```
+
+#### Table for Agreeableness to Friendship Mediation model
+```{r agree_friendship_med_model_tbl}
+parameterestimates(fit_agreeableness_affil_med_model_h4) %>%
+  as.data.frame() %>% 
+  filter(label == "a" |
+         label == "b" |
+         label == "c" |
+         label == "indirecteffect") %>% 
+  rename(ci_upper = ci.upper,
+         ci_lower = ci.lower) %>% 
+  mutate(parameter = case_when(label == "b" ~ "P2(T) Agreeableness -> P2(T) Friendship",
+                              label == "c" ~ "P1(T) Agreeableness -> P2(T) Friendship",
+                              label == "a" ~ "P1(T) Agreeableness -> P2(T) Agreeableness",
+                              label == "indirecteffect" ~ "Mediated Effect"),
+         label == fct_relevel(label,
+                             "a",
+                             "b",
+                             "c"),
+        pvalue = ifelse(pvalue >= .001, 
+                        str_pad(str_replace(round(pvalue, 3),
+                                            "0.", "."), 4, 
+                                side = "right", pad ="0"),  
+                        "< .001"),
+        est = round(est, 2),
+        est = ifelse(str_detect(est, "\\..$"), paste0(est, "0"), 
+                   ifelse(str_detect(est, "^0$"), paste0(est, ".00"), est)),
+        est = cell_spec(est, "html", 
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        ci_lower = round(ci_lower, 2),
+        ci_lower = ifelse(str_detect(ci_lower, "\\..$"), paste0(ci_lower, "0"), 
+                   ifelse(str_detect(ci_lower, "^0$"), paste0(ci_lower, ".00"), ci_lower)),
+        ci_lower = cell_spec(ci_lower, "html", 
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        ci_upper = round(ci_upper, 2),
+        ci_upper = ifelse(str_detect(ci_upper, "\\..$"), paste0(ci_upper, "0"), 
+                   ifelse(str_detect(ci_upper, "^0$"), paste0(ci_upper, ".00"), ci_upper)),
+        ci_upper = cell_spec(ci_upper, "html",
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        z = round(z, 2)) %>% 
+  arrange(label) %>% 
+  select(parameter, est, ci_lower, ci_upper, z, pvalue) %>% 
+  distinct() %>% 
+  knitr::kable(caption = "Agreeableness and Friendship Mediation Results",
+              format = "html", escape = F) %>% 
+ kable_styling("striped", full_width = F) 
+  
+```
+
+Looks like our results are consistent with our hypothesis: P2's perception of the target's friendship is infleunced by their perception of the target's Agreeableness, which is in turn influenced by P1's perception of the target's Agreeableness.
+
+### Alternative Model : All Big Six and Friendship
+
+```{r h3_all6_friendship_multi_med_model}
+big6_affil_multi_med_model_h3alt <-'
+# Model for A-B-C triad
+B_C_contextitem_goodfriend ~ b1*B_C_extraversion + b2*B_C_agreeableness + b3*B_C_conscientiousness + b4*B_C_neuroticism + b5*B_C_openness + b6*B_C_hp + c1*A_C_extraversion + c2*A_C_agreeableness + c3*A_C_conscientiousness + c4*A_C_neuroticism + c5*A_C_openness + c6*A_C_hp 
+
+B_C_extraversion      ~ a1*A_C_extraversion
+B_C_agreeableness     ~ a2*A_C_agreeableness
+B_C_conscientiousness ~ a3*A_C_conscientiousness
+B_C_neuroticism       ~ a4*A_C_neuroticism
+B_C_openness          ~ a5*A_C_openness
+B_C_hp                ~ a6*A_C_hp
+
+# Model for C-D-A triad
+D_A_contextitem_goodfriend ~ b1*D_A_extraversion + b2*D_A_agreeableness + b3*D_A_conscientiousness + b4*D_A_neuroticism + b5*D_A_openness + b6*D_A_hp + c1*C_A_extraversion + c2*C_A_agreeableness + c3*C_A_conscientiousness + c4*C_A_neuroticism + c5*C_A_openness + c6*C_A_hp 
+
+D_A_extraversion      ~ a1*C_A_extraversion
+D_A_agreeableness     ~ a2*C_A_agreeableness
+D_A_conscientiousness ~ a3*C_A_conscientiousness
+D_A_neuroticism       ~ a4*C_A_neuroticism
+D_A_openness          ~ a5*C_A_openness
+D_A_hp                ~ a6*C_A_hp
+
+# variances
+B_C_contextitem_goodfriend ~~ v_P2_gf*B_C_contextitem_goodfriend
+D_A_contextitem_goodfriend ~~ v_P2_gf*D_A_contextitem_goodfriend
+B_C_extraversion ~~ v_P2_ex*B_C_extraversion
+D_A_extraversion ~~ v_P2_ex*D_A_extraversion
+B_C_agreeableness ~~ v_P2_ag*B_C_agreeableness
+D_A_agreeableness ~~ v_P2_ag*D_A_agreeableness
+B_C_conscientiousness ~~ v_P2_co*B_C_conscientiousness
+D_A_conscientiousness ~~ v_P2_co*D_A_conscientiousness
+B_C_neuroticism ~~ v_P2_ne*B_C_neuroticism
+D_A_neuroticism ~~ v_P2_ne*D_A_neuroticism
+B_C_openness ~~ v_P2_op*B_C_openness
+D_A_openness ~~ v_P2_op*D_A_openness
+B_C_hp ~~ v_P2_hp*B_C_hp
+D_A_hp ~~ v_P2_hp*D_A_hp
+
+A_C_extraversion ~~ v_P1_ex*A_C_extraversion
+C_A_extraversion ~~ v_P1_ex*C_A_extraversion
+A_C_agreeableness ~~ v_P1_ag*A_C_agreeableness
+C_A_agreeableness ~~ v_P1_ag*C_A_agreeableness
+A_C_conscientiousness ~~ v_P1_co*A_C_conscientiousness
+C_A_conscientiousness ~~ v_P1_co*C_A_conscientiousness
+A_C_neuroticism ~~ v_P1_ne*A_C_neuroticism
+C_A_neuroticism ~~ v_P1_ne*C_A_neuroticism
+A_C_openness ~~ v_P1_op*A_C_openness
+C_A_openness ~~ v_P1_op*C_A_openness
+A_C_hp ~~ v_P1_hp*A_C_hp
+C_A_hp ~~ v_P1_hp*C_A_hp
+
+
+# intercepts
+
+B_C_contextitem_goodfriend ~ int_P2_gf*1
+D_A_contextitem_goodfriend ~ int_P2_gf*1
+B_C_extraversion ~ int_P2_ex*1
+D_A_extraversion ~ int_P2_ex*1
+B_C_agreeableness ~ int_P2_ag*1
+D_A_agreeableness ~ int_P2_ag*1
+B_C_conscientiousness ~ int_P2_co*1
+D_A_conscientiousness ~ int_P2_co*1
+B_C_neuroticism ~ int_P2_ne*1
+D_A_neuroticism ~ int_P2_ne*1
+B_C_openness ~ int_P2_op*1
+D_A_openness ~ int_P2_op*1
+B_C_hp ~ int_P2_hp*1
+D_A_hp ~ int_P2_hp*1
+
+A_C_extraversion ~ int_P1_ex*1
+C_A_extraversion ~ int_P1_ex*1
+A_C_agreeableness ~ int_P1_ag*1
+C_A_agreeableness ~ int_P1_ag*1
+A_C_conscientiousness ~ int_P1_co*1
+C_A_conscientiousness ~ int_P1_co*1
+A_C_neuroticism ~ int_P1_ne*1
+C_A_neuroticism ~ int_P1_ne*1
+A_C_openness ~ int_P1_op*1
+C_A_openness ~ int_P1_op*1
+A_C_hp ~ int_P1_hp*1
+C_A_hp ~ int_P1_hp*1
+
+
+# indirect (mediated) effect
+indirect_ex := a1*b1
+indirect_ag := a2*b2
+indirect_co := a3*b3
+indirect_ne := a4*b4
+indirect_op := a5*b5
+indirect_hp := a6*b6
+'
+fit_big6_affil_multi_med_model_h3alt <-sem(big6_affil_multi_med_model_h3alt, 
+                                            data = study2, 
+                                            missing = "FIML", 
+                                            se = "bootstrap", 
+                                            fixed.x = TRUE)
+
+summary(fit_big6_affil_multi_med_model_h3alt)
+```
+
+#### Table for Big Six to Friendship Mediation model
+```{r bigsix_friend_med_model_tbl}
+parameterestimates(fit_big6_affil_multi_med_model_h3alt) %>%
+  as.data.frame() %>% 
+  filter(str_detect(label, "^a") |
+         str_detect(label, "^b") |
+         str_detect(label, "^c") |
+         str_detect(label, "^indirect_")) %>% 
+  rename(ci_upper = ci.upper,
+         ci_lower = ci.lower) %>% 
+  mutate(parameter = case_when(
+    label == "a1" ~ "P1(T) Extraversion -> P2(T) Extraversion",
+    label == "a2" ~ "P1(T) Agreeableness -> P2(T) Agreeableness",
+    label == "a3" ~ "P1(T) Conscientiousness -> P2(T) Conscientiousness",
+    label == "a4" ~ "P1(T) Neuroticism -> P2(T) Neuroticism",
+    label == "a5" ~ "P1(T) Openness -> P2(T) Openness",
+    label == "a6" ~ "P1(T) Honesty-Propriety -> P2(T) Honesty-Propriety",
+    label == "b1" ~ "P2(T) Extraversion -> P2(T) Friendship",
+    label == "b2" ~ "P2(T) Agreeableness -> P2(T) Friendship",
+    label == "b3" ~ "P2(T) Conscientiousness -> P2(T) Friendship",
+    label == "b4" ~ "P2(T) Neuroticism -> P2(T) Friendship",
+    label == "b5" ~ "P2(T) Openness -> P2(T) Friendship",
+    label == "b6" ~ "P2(T) Honesty-Propriety -> P2(T) Friendship",
+    label == "c1" ~ "P1(T) Extraversion -> P2(T) Friendship",
+    label == "c2" ~ "P1(T) Agreeableness -> P2(T) Friendship",
+    label == "c3" ~ "P1(T) Conscientiousness -> P2(T) Friendship",
+    label == "c4" ~ "P1(T) Neuroticism -> P2(T) Friendship",
+    label == "c5" ~ "P1(T) Openness -> P2(T) Friendship",
+    label == "c6" ~ "P1(T) Honesty-Propriety -> P2(T) Friendship",
+    label == "indirect_ex" ~ "Indirect Extraversion",
+    label == "indirect_ag" ~ "Indirect Agreeableness",
+    label == "indirect_co" ~ "Indirect Conscientiousness",
+    label == "indirect_ne" ~ "Indirect Neuroticism",
+    label == "indirect_op" ~ "Indirect Openness ",
+    label == "indirect_hp" ~ "Indirect Honesty-Propriety"),
+    label = fct_relevel(label,
+                             "a1",
+                             "a2",
+                             "a3",
+                             "a4",
+                             "a5",
+                             "a6",
+                             "b1",
+                             "b2",
+                             "b3",
+                             "b4",
+                             "b5",
+                             "b6",
+                             "c1",
+                             "c2",
+                             "c3",
+                             "c4",
+                             "c5",
+                             "c6",
+                             "indirect_ex",
+                             "indirect_ag",
+                             "indirect_co",
+                             "indirect_ne",
+                             "indirect_op",
+                             "indirect_hp"),
+        pvalue = ifelse(pvalue >= .001, 
+                        str_pad(str_replace(round(pvalue, 3),
+                                            "0.", "."), 4, 
+                                side = "right", pad ="0"),  
+                        "< .001"),
+        est = round(est, 2),
+        est = ifelse(str_detect(est, "\\..$"), paste0(est, "0"), 
+                   ifelse(str_detect(est, "^0$"), paste0(est, ".00"), est)),
+        est = cell_spec(est, "html", 
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        ci_lower = round(ci_lower, 2),
+        ci_lower = ifelse(str_detect(ci_lower, "\\..$"), paste0(ci_lower, "0"), 
+                   ifelse(str_detect(ci_lower, "^0$"), paste0(ci_lower, ".00"), ci_lower)),
+        ci_lower = cell_spec(ci_lower, "html", 
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        ci_upper = round(ci_upper, 2),
+        ci_upper = ifelse(str_detect(ci_upper, "\\..$"), paste0(ci_upper, "0"), 
+                   ifelse(str_detect(ci_upper, "^0$"), paste0(ci_upper, ".00"), ci_upper)),
+        ci_upper = cell_spec(ci_upper, "html",
+                            bold = ifelse(abs(z) > 1.96, TRUE, FALSE)),
+        z = round(z, 2)) %>% 
+  arrange(label) %>% 
+  select(parameter, est, ci_lower, ci_upper, z, pvalue) %>% 
+  distinct() %>% 
+  knitr::kable(caption = "All Big Six and Friendship Mediation Results",
+              format = "html", escape = F) %>% 
+ kable_styling("striped", full_width = F) %>% 
+ pack_rows("Hearsay Consensus Path", 1, 6) %>% 
+ pack_rows("Hearsay Reputations of Big Six to Friendship", 7, 12) %>% 
+ pack_rows("Direct Reputations of Big Six to Hearsay Reputations of Friendship", 13, 18) %>% 
+ pack_rows("Indirect (Mediated) Effects", 19, 24)
+```
+
+Looks like the b path (P2(T) trait -> P2(T) friendship) and indirect effect are only significant for Agreeableness; the remaining Big Six did not have a significant b path or indirect effect (Openness was close, but no cigar). Suggests that P2's perception of T's friendship is determined by how Agreeable they think T is, which in turn is affected by P1's perception of T's Agreeableness. 
+
