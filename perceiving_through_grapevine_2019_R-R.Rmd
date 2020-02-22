@@ -1,5 +1,5 @@
 ---
-title: "Profile Analyses (based on JPSP Round 1 reviews)"
+title: "Analyses in Perceiving through the Grapevine: A Network Approach to Reputations (Revision 1)"
 author: "MASKED FOR PEER REVIEW"
 date: "last knitted: `r Sys.time()`"
 output:
