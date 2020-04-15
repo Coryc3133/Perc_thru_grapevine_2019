@@ -35,6 +35,7 @@ study2 <- import("Data/rep_s2_4ms.csv") %>%
   mutate(condition = ifelse(condition == "", NA, condition),
          study = "study 2")
 item_pos <- import("Data/rep_BigSix_Evaluativeness.csv")
+
 ```
 
 
@@ -45,7 +46,8 @@ study1_profiles <-
   study1 %>% 
   select(sess_id, contains("bfi")) %>% 
   gather(var, rating, -sess_id) %>%
-  separate(var, c("perceiver", "target", "item"), extra = "merge") %>%
+  separate(var, c("perceiver", "target", "item"), 
+           extra = "merge") %>%
   filter(target == "A" | target == "C") %>% 
   mutate(triad_id = 
            case_when(target == "A" ~ "ACD",
@@ -55,11 +57,15 @@ study1_profiles <-
                      perceiver == "B" ~ "p2",
                      perceiver == "D" ~ "p2",
                      TRUE ~ "p1")) %>%
-  select(sess_id, triad_id, item, rating_type, rating) %>% 
+  select(sess_id, triad_id, item, 
+         rating_type, rating) %>% 
   spread(rating_type, rating) %>% 
   # center ratings
-  mutate(p1 = p1 - mean(p1, na.rm = TRUE),
+  mutate(p1_uncent = p1,
+         p1 = p1 - mean(p1, na.rm = TRUE),
+         p2_uncent = p2,
          p2 = p2 - mean(p2, na.rm = TRUE),
+         self_uncent =  self,
          self = self - mean(self, na.rm = TRUE)) %>% 
   # calculate normative and distinctive profiles
   group_by(item) %>% 
@@ -76,7 +82,8 @@ study2_profiles <-
   study2 %>% 
   select(sess_id, contains("bfi")) %>% 
   gather(var, rating, -sess_id) %>%
-  separate(var, c("perceiver", "target", "item"), extra = "merge") %>%
+  separate(var, c("perceiver", "target", "item"), 
+           extra = "merge") %>%
   filter(target == "A" | target == "C") %>% 
   mutate(triad_id = 
            case_when(target == "A" ~ "ACD",
@@ -86,11 +93,15 @@ study2_profiles <-
                      perceiver == "B" ~ "p2",
                      perceiver == "D" ~ "p2",
                      TRUE ~ "p1")) %>%
-  select(sess_id, triad_id, item, rating_type, rating) %>% 
+  select(sess_id, triad_id, item, 
+         rating_type, rating) %>% 
   spread(rating_type, rating) %>% 
   # center ratings
-  mutate(p1 = p1 - mean(p1, na.rm = TRUE),
+  mutate(p1_uncent = p1,
+         p1 = p1 - mean(p1, na.rm = TRUE),
+         p2_uncent = p2,
          p2 = p2 - mean(p2, na.rm = TRUE),
+         self_uncent =  self,
          self = self - mean(self, na.rm = TRUE)) %>% 
   # calculate normative and distinctive profiles
   group_by(item) %>% 
@@ -112,10 +123,11 @@ item_pos %>%
 ```{r pos_profile}
 item_pos_prof <- item_pos %>% 
   gather(item, rating, -subj) %>% 
-  # mid-point center it
-  mutate(rating = rating - mean(rating, na.rm = TRUE)) %>% 
+  # mean center it
+  mutate(rating_cent = rating - mean(rating, na.rm = TRUE)) %>% 
   group_by(item) %>% 
-  summarize(pos = mean(rating, na.rm = TRUE)) %>% 
+  summarize(pos = mean(rating_cent, na.rm = TRUE),
+            pos_uncent = mean(rating, na.rm = TRUE)) %>% 
   mutate(item = str_to_lower(item),
          item = str_replace_all(item, "bfie_", "bfi_"))
 ```
@@ -124,11 +136,11 @@ item_pos_prof <- item_pos %>%
 
 ```{r join_pos}
 # study 1
-study1_profiles <- study1_profiles %>% 
+study1_profiles <- study1_profiles %>%  
   left_join(item_pos_prof)
 
 # study 2
-study2_profiles <- study2_profiles %>% 
+study2_profiles <- study2_profiles %>%  
   left_join(item_pos_prof)
 ```
 
@@ -694,12 +706,43 @@ random_coefs_tbl <- function(model){
 
 ```{r combine_data}
 # create study column
-study1_profiles$study <- "study1"
-study2_profiles$study <- "study2"
+study1_profiles$study <- "study1"  
+study2_profiles$study <- "study2"  
 
-integrated_profiles <- 
-  rbind(study1_profiles, study2_profiles)
+# join studies
+integrated_profiles <- rbind(study1_profiles,  
+                             study2_profiles)
 ```
+
+## Item-level Means for Each Rater (T(T), P1(T), P2(T)) and Desirability
+
+```{r item_lvl_means}
+
+# item text
+full_bigsix_text <- 
+  import("data/rep_bigsix_item_text.csv") %>% 
+  mutate(item = stringr::str_to_lower(item),
+         item = stringr::str_replace_all(item, "bfii", "bfi"))
+
+integrated_profiles %>% 
+  group_by(item) %>% 
+  summarize(self = mean(self_uncent, na.rm = TRUE),
+         p1 = mean(p1_uncent, na.rm = TRUE),
+         p2 = mean(p2_uncent, na.rm = TRUE),
+         positivity = mean(pos_uncent, na.rm = TRUE)) %>% 
+  left_join(full_bigsix_text) %>% 
+  mutate(order = str_extract(item, "\\d*$"),
+         order = as.numeric(order),
+         # put hp at the end
+         order = ifelse(str_detect(item, "hp"), order + 100, order)) %>% 
+  arrange(order) %>% 
+  select(item, text, self, p1, p2, positivity) %>% 
+  knitr::kable(style = "html",
+               digits = c(NA, NA, 2, 2, 2, 2),
+               caption = "Table of (Uncentered) Mean Ratings for Big Six Items by Rater Type") %>% 
+  kableExtra::kable_styling("striped", full_width = F)
+```
+
 
 ## P1-P2 Agreement 
 

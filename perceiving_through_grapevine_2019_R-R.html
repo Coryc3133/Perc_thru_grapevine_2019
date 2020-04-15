@@ -2862,7 +2862,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Analyses in Perceiving through the Grapevine: A Network Approach to Reputations (Revision 1)</h1>
 <h4 class="author">MASKED FOR PEER REVIEW</h4>
-<h4 class="date">last knitted: 2020-02-22 11:48:01</h4>
+<h4 class="date">last knitted: 2020-04-14 19:11:32</h4>
 
 </div>
 
@@ -2899,7 +2899,8 @@ item_pos &lt;- import(&quot;Data/rep_BigSix_Evaluativeness.csv&quot;)</code></pr
   study1 %&gt;% 
   select(sess_id, contains(&quot;bfi&quot;)) %&gt;% 
   gather(var, rating, -sess_id) %&gt;%
-  separate(var, c(&quot;perceiver&quot;, &quot;target&quot;, &quot;item&quot;), extra = &quot;merge&quot;) %&gt;%
+  separate(var, c(&quot;perceiver&quot;, &quot;target&quot;, &quot;item&quot;), 
+           extra = &quot;merge&quot;) %&gt;%
   filter(target == &quot;A&quot; | target == &quot;C&quot;) %&gt;% 
   mutate(triad_id = 
            case_when(target == &quot;A&quot; ~ &quot;ACD&quot;,
@@ -2909,11 +2910,15 @@ item_pos &lt;- import(&quot;Data/rep_BigSix_Evaluativeness.csv&quot;)</code></pr
                      perceiver == &quot;B&quot; ~ &quot;p2&quot;,
                      perceiver == &quot;D&quot; ~ &quot;p2&quot;,
                      TRUE ~ &quot;p1&quot;)) %&gt;%
-  select(sess_id, triad_id, item, rating_type, rating) %&gt;% 
+  select(sess_id, triad_id, item, 
+         rating_type, rating) %&gt;% 
   spread(rating_type, rating) %&gt;% 
   # center ratings
-  mutate(p1 = p1 - mean(p1, na.rm = TRUE),
+  mutate(p1_uncent = p1,
+         p1 = p1 - mean(p1, na.rm = TRUE),
+         p2_uncent = p2,
          p2 = p2 - mean(p2, na.rm = TRUE),
+         self_uncent =  self,
          self = self - mean(self, na.rm = TRUE)) %&gt;% 
   # calculate normative and distinctive profiles
   group_by(item) %&gt;% 
@@ -2928,7 +2933,8 @@ item_pos &lt;- import(&quot;Data/rep_BigSix_Evaluativeness.csv&quot;)</code></pr
   study2 %&gt;% 
   select(sess_id, contains(&quot;bfi&quot;)) %&gt;% 
   gather(var, rating, -sess_id) %&gt;%
-  separate(var, c(&quot;perceiver&quot;, &quot;target&quot;, &quot;item&quot;), extra = &quot;merge&quot;) %&gt;%
+  separate(var, c(&quot;perceiver&quot;, &quot;target&quot;, &quot;item&quot;), 
+           extra = &quot;merge&quot;) %&gt;%
   filter(target == &quot;A&quot; | target == &quot;C&quot;) %&gt;% 
   mutate(triad_id = 
            case_when(target == &quot;A&quot; ~ &quot;ACD&quot;,
@@ -2938,11 +2944,15 @@ item_pos &lt;- import(&quot;Data/rep_BigSix_Evaluativeness.csv&quot;)</code></pr
                      perceiver == &quot;B&quot; ~ &quot;p2&quot;,
                      perceiver == &quot;D&quot; ~ &quot;p2&quot;,
                      TRUE ~ &quot;p1&quot;)) %&gt;%
-  select(sess_id, triad_id, item, rating_type, rating) %&gt;% 
+  select(sess_id, triad_id, item, 
+         rating_type, rating) %&gt;% 
   spread(rating_type, rating) %&gt;% 
   # center ratings
-  mutate(p1 = p1 - mean(p1, na.rm = TRUE),
+  mutate(p1_uncent = p1,
+         p1 = p1 - mean(p1, na.rm = TRUE),
+         p2_uncent = p2,
          p2 = p2 - mean(p2, na.rm = TRUE),
+         self_uncent =  self,
          self = self - mean(self, na.rm = TRUE)) %&gt;% 
   # calculate normative and distinctive profiles
   group_by(item) %&gt;% 
@@ -2975,20 +2985,21 @@ item_pos &lt;- import(&quot;Data/rep_BigSix_Evaluativeness.csv&quot;)</code></pr
 <h3>Calculating Item Positivity Profile</h3>
 <pre class="r"><code>item_pos_prof &lt;- item_pos %&gt;% 
   gather(item, rating, -subj) %&gt;% 
-  # mid-point center it
-  mutate(rating = rating - mean(rating, na.rm = TRUE)) %&gt;% 
+  # mean center it
+  mutate(rating_cent = rating - mean(rating, na.rm = TRUE)) %&gt;% 
   group_by(item) %&gt;% 
-  summarize(pos = mean(rating, na.rm = TRUE)) %&gt;% 
+  summarize(pos = mean(rating_cent, na.rm = TRUE),
+            pos_uncent = mean(rating, na.rm = TRUE)) %&gt;% 
   mutate(item = str_to_lower(item),
          item = str_replace_all(item, &quot;bfie_&quot;, &quot;bfi_&quot;))</code></pre>
 <div id="joining-to-other-data" class="section level4">
 <h4>Joining to other data</h4>
 <pre class="r"><code># study 1
-study1_profiles &lt;- study1_profiles %&gt;% 
+study1_profiles &lt;- study1_profiles %&gt;%  
   left_join(item_pos_prof)
 
 # study 2
-study2_profiles &lt;- study2_profiles %&gt;% 
+study2_profiles &lt;- study2_profiles %&gt;%  
   left_join(item_pos_prof)</code></pre>
 </div>
 </div>
@@ -4049,11 +4060,1427 @@ fixed_coefs_tbl &lt;- function(model){
 <div id="combining-study-1-and-2-for-integrated-analyses" class="section level2">
 <h2>Combining Study 1 and 2 for integrated analyses</h2>
 <pre class="r"><code># create study column
-study1_profiles$study &lt;- &quot;study1&quot;
-study2_profiles$study &lt;- &quot;study2&quot;
+study1_profiles$study &lt;- &quot;study1&quot;  
+study2_profiles$study &lt;- &quot;study2&quot;  
 
-integrated_profiles &lt;- 
-  rbind(study1_profiles, study2_profiles)</code></pre>
+# join studies
+integrated_profiles &lt;- rbind(study1_profiles,  
+                             study2_profiles)</code></pre>
+</div>
+<div id="item-level-means-for-each-rater-tt-p1t-p2t-and-desirability" class="section level2">
+<h2>Item-level Means for Each Rater (T(T), P1(T), P2(T)) and Desirability</h2>
+<pre class="r"><code># item text
+full_bigsix_text &lt;- 
+  import(&quot;data/rep_bigsix_item_text.csv&quot;) %&gt;% 
+  mutate(item = stringr::str_to_lower(item),
+         item = stringr::str_replace_all(item, &quot;bfii&quot;, &quot;bfi&quot;))
+
+integrated_profiles %&gt;% 
+  group_by(item) %&gt;% 
+  summarize(self = mean(self_uncent, na.rm = TRUE),
+         p1 = mean(p1_uncent, na.rm = TRUE),
+         p2 = mean(p2_uncent, na.rm = TRUE),
+         positivity = mean(pos_uncent, na.rm = TRUE)) %&gt;% 
+  left_join(full_bigsix_text) %&gt;% 
+  mutate(order = str_extract(item, &quot;\\d*$&quot;),
+         order = as.numeric(order),
+         # put hp at the end
+         order = ifelse(str_detect(item, &quot;hp&quot;), order + 100, order)) %&gt;% 
+  arrange(order) %&gt;% 
+  select(item, text, self, p1, p2, positivity) %&gt;% 
+  knitr::kable(style = &quot;html&quot;,
+               digits = c(NA, NA, 2, 2, 2, 2),
+               caption = &quot;Table of (Uncentered) Mean Ratings for Big Six Items by Rater Type&quot;) %&gt;% 
+  kableExtra::kable_styling(&quot;striped&quot;, full_width = F)</code></pre>
+<table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+Table of (Uncentered) Mean Ratings for Big Six Items by Rater Type
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+item
+</th>
+<th style="text-align:left;">
+text
+</th>
+<th style="text-align:right;">
+self
+</th>
+<th style="text-align:right;">
+p1
+</th>
+<th style="text-align:right;">
+p2
+</th>
+<th style="text-align:right;">
+positivity
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+bfi_1
+</td>
+<td style="text-align:left;">
+Is Outgoing, Sociable.
+</td>
+<td style="text-align:right;">
+3.93
+</td>
+<td style="text-align:right;">
+3.86
+</td>
+<td style="text-align:right;">
+3.71
+</td>
+<td style="text-align:right;">
+4.46
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_2
+</td>
+<td style="text-align:left;">
+Is Compassionate, has a soft heart.
+</td>
+<td style="text-align:right;">
+4.43
+</td>
+<td style="text-align:right;">
+4.23
+</td>
+<td style="text-align:right;">
+4.00
+</td>
+<td style="text-align:right;">
+4.54
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_3
+</td>
+<td style="text-align:left;">
+Tends to be disorganized.
+</td>
+<td style="text-align:right;">
+2.86
+</td>
+<td style="text-align:right;">
+2.41
+</td>
+<td style="text-align:right;">
+2.29
+</td>
+<td style="text-align:right;">
+2.00
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_4
+</td>
+<td style="text-align:left;">
+Is relaxed, handles stress well.
+</td>
+<td style="text-align:right;">
+3.07
+</td>
+<td style="text-align:right;">
+3.57
+</td>
+<td style="text-align:right;">
+3.39
+</td>
+<td style="text-align:right;">
+4.54
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_5
+</td>
+<td style="text-align:left;">
+Has few artistic interests.
+</td>
+<td style="text-align:right;">
+2.72
+</td>
+<td style="text-align:right;">
+2.84
+</td>
+<td style="text-align:right;">
+2.96
+</td>
+<td style="text-align:right;">
+2.46
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_6
+</td>
+<td style="text-align:left;">
+Has an assertive personality.
+</td>
+<td style="text-align:right;">
+3.09
+</td>
+<td style="text-align:right;">
+2.79
+</td>
+<td style="text-align:right;">
+2.88
+</td>
+<td style="text-align:right;">
+3.15
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_7
+</td>
+<td style="text-align:left;">
+Is respectful, treats others with respect.
+</td>
+<td style="text-align:right;">
+4.71
+</td>
+<td style="text-align:right;">
+4.53
+</td>
+<td style="text-align:right;">
+4.31
+</td>
+<td style="text-align:right;">
+4.85
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_8
+</td>
+<td style="text-align:left;">
+Tends to be lazy.
+</td>
+<td style="text-align:right;">
+3.15
+</td>
+<td style="text-align:right;">
+2.35
+</td>
+<td style="text-align:right;">
+2.12
+</td>
+<td style="text-align:right;">
+1.46
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_9
+</td>
+<td style="text-align:left;">
+Stays optimistic after experiencing a setback.
+</td>
+<td style="text-align:right;">
+3.61
+</td>
+<td style="text-align:right;">
+3.73
+</td>
+<td style="text-align:right;">
+3.55
+</td>
+<td style="text-align:right;">
+4.62
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_10
+</td>
+<td style="text-align:left;">
+Is curious about many different things.
+</td>
+<td style="text-align:right;">
+4.41
+</td>
+<td style="text-align:right;">
+3.88
+</td>
+<td style="text-align:right;">
+3.71
+</td>
+<td style="text-align:right;">
+4.31
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_11
+</td>
+<td style="text-align:left;">
+Rarely feels excited or eager.
+</td>
+<td style="text-align:right;">
+2.09
+</td>
+<td style="text-align:right;">
+2.35
+</td>
+<td style="text-align:right;">
+2.43
+</td>
+<td style="text-align:right;">
+1.92
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_12
+</td>
+<td style="text-align:left;">
+Tends to find fault with others.
+</td>
+<td style="text-align:right;">
+2.65
+</td>
+<td style="text-align:right;">
+2.32
+</td>
+<td style="text-align:right;">
+2.44
+</td>
+<td style="text-align:right;">
+1.31
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_13
+</td>
+<td style="text-align:left;">
+Is dependable, steady.
+</td>
+<td style="text-align:right;">
+4.20
+</td>
+<td style="text-align:right;">
+3.95
+</td>
+<td style="text-align:right;">
+3.89
+</td>
+<td style="text-align:right;">
+4.62
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_14
+</td>
+<td style="text-align:left;">
+Is moody, has up and down mood swings.
+</td>
+<td style="text-align:right;">
+2.89
+</td>
+<td style="text-align:right;">
+2.42
+</td>
+<td style="text-align:right;">
+2.54
+</td>
+<td style="text-align:right;">
+1.92
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_15
+</td>
+<td style="text-align:left;">
+Is inventive, finds clever ways to do things.
+</td>
+<td style="text-align:right;">
+3.70
+</td>
+<td style="text-align:right;">
+3.39
+</td>
+<td style="text-align:right;">
+3.29
+</td>
+<td style="text-align:right;">
+4.38
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_16
+</td>
+<td style="text-align:left;">
+Tends to be quiet.
+</td>
+<td style="text-align:right;">
+3.17
+</td>
+<td style="text-align:right;">
+3.14
+</td>
+<td style="text-align:right;">
+3.10
+</td>
+<td style="text-align:right;">
+2.62
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_17
+</td>
+<td style="text-align:left;">
+Feels little sympathy for others.
+</td>
+<td style="text-align:right;">
+2.68
+</td>
+<td style="text-align:right;">
+2.73
+</td>
+<td style="text-align:right;">
+2.90
+</td>
+<td style="text-align:right;">
+1.38
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_18
+</td>
+<td style="text-align:left;">
+Is systematic, likes to keep things in order.
+</td>
+<td style="text-align:right;">
+3.78
+</td>
+<td style="text-align:right;">
+3.80
+</td>
+<td style="text-align:right;">
+3.71
+</td>
+<td style="text-align:right;">
+3.92
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_19
+</td>
+<td style="text-align:left;">
+Can be tense.
+</td>
+<td style="text-align:right;">
+3.65
+</td>
+<td style="text-align:right;">
+3.04
+</td>
+<td style="text-align:right;">
+3.11
+</td>
+<td style="text-align:right;">
+2.23
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_20
+</td>
+<td style="text-align:left;">
+Is fascinated by art, music, or literature.
+</td>
+<td style="text-align:right;">
+3.90
+</td>
+<td style="text-align:right;">
+3.44
+</td>
+<td style="text-align:right;">
+3.28
+</td>
+<td style="text-align:right;">
+3.69
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_21
+</td>
+<td style="text-align:left;">
+Is dominant, acts as a leader.
+</td>
+<td style="text-align:right;">
+3.36
+</td>
+<td style="text-align:right;">
+2.83
+</td>
+<td style="text-align:right;">
+2.94
+</td>
+<td style="text-align:right;">
+3.38
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_22
+</td>
+<td style="text-align:left;">
+Starts arguments with others.
+</td>
+<td style="text-align:right;">
+2.09
+</td>
+<td style="text-align:right;">
+2.11
+</td>
+<td style="text-align:right;">
+2.20
+</td>
+<td style="text-align:right;">
+1.46
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_23
+</td>
+<td style="text-align:left;">
+Has difficulty getting started on tasks.
+</td>
+<td style="text-align:right;">
+3.32
+</td>
+<td style="text-align:right;">
+2.59
+</td>
+<td style="text-align:right;">
+2.49
+</td>
+<td style="text-align:right;">
+2.08
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_24
+</td>
+<td style="text-align:left;">
+Feels secure, comfortable with self.
+</td>
+<td style="text-align:right;">
+3.65
+</td>
+<td style="text-align:right;">
+3.83
+</td>
+<td style="text-align:right;">
+3.63
+</td>
+<td style="text-align:right;">
+4.92
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_25
+</td>
+<td style="text-align:left;">
+Avoids intellectual, philosophical discussions.
+</td>
+<td style="text-align:right;">
+2.09
+</td>
+<td style="text-align:right;">
+2.41
+</td>
+<td style="text-align:right;">
+2.57
+</td>
+<td style="text-align:right;">
+2.08
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_26
+</td>
+<td style="text-align:left;">
+Is less active than other people.
+</td>
+<td style="text-align:right;">
+2.44
+</td>
+<td style="text-align:right;">
+2.38
+</td>
+<td style="text-align:right;">
+2.42
+</td>
+<td style="text-align:right;">
+2.31
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_27
+</td>
+<td style="text-align:left;">
+Has a forgiving nature.
+</td>
+<td style="text-align:right;">
+4.19
+</td>
+<td style="text-align:right;">
+4.08
+</td>
+<td style="text-align:right;">
+3.77
+</td>
+<td style="text-align:right;">
+4.38
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_28
+</td>
+<td style="text-align:left;">
+Can be somewhat careless.
+</td>
+<td style="text-align:right;">
+3.00
+</td>
+<td style="text-align:right;">
+2.66
+</td>
+<td style="text-align:right;">
+2.61
+</td>
+<td style="text-align:right;">
+2.23
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_29
+</td>
+<td style="text-align:left;">
+Is emotionally stable, not easily upset.
+</td>
+<td style="text-align:right;">
+3.31
+</td>
+<td style="text-align:right;">
+3.64
+</td>
+<td style="text-align:right;">
+3.40
+</td>
+<td style="text-align:right;">
+4.46
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_30
+</td>
+<td style="text-align:left;">
+Has little creativity.
+</td>
+<td style="text-align:right;">
+2.33
+</td>
+<td style="text-align:right;">
+2.42
+</td>
+<td style="text-align:right;">
+2.62
+</td>
+<td style="text-align:right;">
+2.31
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_31
+</td>
+<td style="text-align:left;">
+Is sometimes shy, introverted.
+</td>
+<td style="text-align:right;">
+3.70
+</td>
+<td style="text-align:right;">
+3.52
+</td>
+<td style="text-align:right;">
+3.34
+</td>
+<td style="text-align:right;">
+2.69
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_32
+</td>
+<td style="text-align:left;">
+Is helpful and unselfish with others.
+</td>
+<td style="text-align:right;">
+4.23
+</td>
+<td style="text-align:right;">
+4.01
+</td>
+<td style="text-align:right;">
+3.69
+</td>
+<td style="text-align:right;">
+4.69
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_33
+</td>
+<td style="text-align:left;">
+Keeps things neat and tidy.
+</td>
+<td style="text-align:right;">
+3.48
+</td>
+<td style="text-align:right;">
+3.75
+</td>
+<td style="text-align:right;">
+3.61
+</td>
+<td style="text-align:right;">
+3.77
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_34
+</td>
+<td style="text-align:left;">
+Worries a lot.
+</td>
+<td style="text-align:right;">
+3.79
+</td>
+<td style="text-align:right;">
+3.22
+</td>
+<td style="text-align:right;">
+3.10
+</td>
+<td style="text-align:right;">
+2.15
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_35
+</td>
+<td style="text-align:left;">
+Values art and beauty.
+</td>
+<td style="text-align:right;">
+4.08
+</td>
+<td style="text-align:right;">
+3.49
+</td>
+<td style="text-align:right;">
+3.36
+</td>
+<td style="text-align:right;">
+3.85
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_36
+</td>
+<td style="text-align:left;">
+Finds it hard to influence people.
+</td>
+<td style="text-align:right;">
+2.58
+</td>
+<td style="text-align:right;">
+3.03
+</td>
+<td style="text-align:right;">
+2.90
+</td>
+<td style="text-align:right;">
+2.77
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_37
+</td>
+<td style="text-align:left;">
+Is sometimes rude to others.
+</td>
+<td style="text-align:right;">
+2.55
+</td>
+<td style="text-align:right;">
+2.37
+</td>
+<td style="text-align:right;">
+2.41
+</td>
+<td style="text-align:right;">
+1.77
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_38
+</td>
+<td style="text-align:left;">
+Is efficient, gets things done.
+</td>
+<td style="text-align:right;">
+4.00
+</td>
+<td style="text-align:right;">
+3.92
+</td>
+<td style="text-align:right;">
+3.86
+</td>
+<td style="text-align:right;">
+4.23
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_39
+</td>
+<td style="text-align:left;">
+Often feels sad.
+</td>
+<td style="text-align:right;">
+2.90
+</td>
+<td style="text-align:right;">
+2.59
+</td>
+<td style="text-align:right;">
+2.70
+</td>
+<td style="text-align:right;">
+2.38
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_40
+</td>
+<td style="text-align:left;">
+Is complex, a deep thinker.
+</td>
+<td style="text-align:right;">
+4.08
+</td>
+<td style="text-align:right;">
+3.49
+</td>
+<td style="text-align:right;">
+3.47
+</td>
+<td style="text-align:right;">
+4.15
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_41
+</td>
+<td style="text-align:left;">
+Is full of energy.
+</td>
+<td style="text-align:right;">
+3.57
+</td>
+<td style="text-align:right;">
+3.44
+</td>
+<td style="text-align:right;">
+3.54
+</td>
+<td style="text-align:right;">
+4.31
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_42
+</td>
+<td style="text-align:left;">
+Is suspicious of others’ intentions.
+</td>
+<td style="text-align:right;">
+3.45
+</td>
+<td style="text-align:right;">
+2.70
+</td>
+<td style="text-align:right;">
+2.86
+</td>
+<td style="text-align:right;">
+2.00
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_43
+</td>
+<td style="text-align:left;">
+Is reliable, can always be counted on.
+</td>
+<td style="text-align:right;">
+4.31
+</td>
+<td style="text-align:right;">
+3.84
+</td>
+<td style="text-align:right;">
+3.74
+</td>
+<td style="text-align:right;">
+4.85
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_44
+</td>
+<td style="text-align:left;">
+Keeps their emotions under control.
+</td>
+<td style="text-align:right;">
+3.67
+</td>
+<td style="text-align:right;">
+3.87
+</td>
+<td style="text-align:right;">
+3.51
+</td>
+<td style="text-align:right;">
+4.00
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_45
+</td>
+<td style="text-align:left;">
+Has difficulty imagining things.
+</td>
+<td style="text-align:right;">
+2.02
+</td>
+<td style="text-align:right;">
+2.57
+</td>
+<td style="text-align:right;">
+2.63
+</td>
+<td style="text-align:right;">
+2.54
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_46
+</td>
+<td style="text-align:left;">
+Is talkative.
+</td>
+<td style="text-align:right;">
+3.86
+</td>
+<td style="text-align:right;">
+3.63
+</td>
+<td style="text-align:right;">
+3.49
+</td>
+<td style="text-align:right;">
+3.08
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_47
+</td>
+<td style="text-align:left;">
+Can be cold and uncaring.
+</td>
+<td style="text-align:right;">
+2.23
+</td>
+<td style="text-align:right;">
+1.98
+</td>
+<td style="text-align:right;">
+2.21
+</td>
+<td style="text-align:right;">
+1.38
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_48
+</td>
+<td style="text-align:left;">
+Leaves a mess, doesn’t clean up.
+</td>
+<td style="text-align:right;">
+1.87
+</td>
+<td style="text-align:right;">
+2.11
+</td>
+<td style="text-align:right;">
+2.28
+</td>
+<td style="text-align:right;">
+1.69
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_49
+</td>
+<td style="text-align:left;">
+Rarely feels anxious or afraid.
+</td>
+<td style="text-align:right;">
+2.50
+</td>
+<td style="text-align:right;">
+2.78
+</td>
+<td style="text-align:right;">
+2.79
+</td>
+<td style="text-align:right;">
+3.62
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_50
+</td>
+<td style="text-align:left;">
+Thinks poetry and plays are boring.
+</td>
+<td style="text-align:right;">
+2.69
+</td>
+<td style="text-align:right;">
+2.82
+</td>
+<td style="text-align:right;">
+2.89
+</td>
+<td style="text-align:right;">
+2.31
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_51
+</td>
+<td style="text-align:left;">
+Prefers to have others take charge.
+</td>
+<td style="text-align:right;">
+2.83
+</td>
+<td style="text-align:right;">
+3.13
+</td>
+<td style="text-align:right;">
+2.99
+</td>
+<td style="text-align:right;">
+2.46
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_52
+</td>
+<td style="text-align:left;">
+Is polite, courteous to others.
+</td>
+<td style="text-align:right;">
+4.60
+</td>
+<td style="text-align:right;">
+4.44
+</td>
+<td style="text-align:right;">
+4.16
+</td>
+<td style="text-align:right;">
+4.62
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_53
+</td>
+<td style="text-align:left;">
+Is persistent, works until task is finished.
+</td>
+<td style="text-align:right;">
+3.98
+</td>
+<td style="text-align:right;">
+3.99
+</td>
+<td style="text-align:right;">
+3.85
+</td>
+<td style="text-align:right;">
+4.54
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_54
+</td>
+<td style="text-align:left;">
+Tends to feel depressed, blue.
+</td>
+<td style="text-align:right;">
+2.62
+</td>
+<td style="text-align:right;">
+2.45
+</td>
+<td style="text-align:right;">
+2.54
+</td>
+<td style="text-align:right;">
+2.15
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_55
+</td>
+<td style="text-align:left;">
+Has little interest in abstract ideas.
+</td>
+<td style="text-align:right;">
+2.31
+</td>
+<td style="text-align:right;">
+2.60
+</td>
+<td style="text-align:right;">
+2.77
+</td>
+<td style="text-align:right;">
+2.46
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_56
+</td>
+<td style="text-align:left;">
+Shows a lot of enthusiasm.
+</td>
+<td style="text-align:right;">
+3.78
+</td>
+<td style="text-align:right;">
+3.51
+</td>
+<td style="text-align:right;">
+3.55
+</td>
+<td style="text-align:right;">
+4.31
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_57
+</td>
+<td style="text-align:left;">
+Assumes the best about people.
+</td>
+<td style="text-align:right;">
+3.84
+</td>
+<td style="text-align:right;">
+3.82
+</td>
+<td style="text-align:right;">
+3.62
+</td>
+<td style="text-align:right;">
+4.46
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_58
+</td>
+<td style="text-align:left;">
+Sometimes behaves irresponsibly.
+</td>
+<td style="text-align:right;">
+3.25
+</td>
+<td style="text-align:right;">
+2.77
+</td>
+<td style="text-align:right;">
+2.82
+</td>
+<td style="text-align:right;">
+2.00
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_59
+</td>
+<td style="text-align:left;">
+Is temperamental, gets emotional easily.
+</td>
+<td style="text-align:right;">
+2.77
+</td>
+<td style="text-align:right;">
+2.56
+</td>
+<td style="text-align:right;">
+2.75
+</td>
+<td style="text-align:right;">
+1.62
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_60
+</td>
+<td style="text-align:left;">
+Is original, comes up with new ideas.
+</td>
+<td style="text-align:right;">
+3.59
+</td>
+<td style="text-align:right;">
+3.35
+</td>
+<td style="text-align:right;">
+3.25
+</td>
+<td style="text-align:right;">
+4.15
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_hp45
+</td>
+<td style="text-align:left;">
+Uses flattery to get ahead.
+</td>
+<td style="text-align:right;">
+2.62
+</td>
+<td style="text-align:right;">
+2.24
+</td>
+<td style="text-align:right;">
+2.50
+</td>
+<td style="text-align:right;">
+1.85
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_hp46
+</td>
+<td style="text-align:left;">
+Takes risks that could cause trouble for him or her.
+</td>
+<td style="text-align:right;">
+2.84
+</td>
+<td style="text-align:right;">
+2.72
+</td>
+<td style="text-align:right;">
+2.68
+</td>
+<td style="text-align:right;">
+2.15
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_hp47
+</td>
+<td style="text-align:left;">
+Uses others for his or her own ends.
+</td>
+<td style="text-align:right;">
+2.02
+</td>
+<td style="text-align:right;">
+2.05
+</td>
+<td style="text-align:right;">
+2.21
+</td>
+<td style="text-align:right;">
+1.15
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_hp48
+</td>
+<td style="text-align:left;">
+Misrepresents the facts.
+</td>
+<td style="text-align:right;">
+2.16
+</td>
+<td style="text-align:right;">
+2.22
+</td>
+<td style="text-align:right;">
+2.48
+</td>
+<td style="text-align:right;">
+1.15
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_hp49
+</td>
+<td style="text-align:left;">
+Has bad manners.
+</td>
+<td style="text-align:right;">
+1.51
+</td>
+<td style="text-align:right;">
+1.47
+</td>
+<td style="text-align:right;">
+2.04
+</td>
+<td style="text-align:right;">
+1.25
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_hp50
+</td>
+<td style="text-align:left;">
+Would never take things that aren’t their own.
+</td>
+<td style="text-align:right;">
+4.12
+</td>
+<td style="text-align:right;">
+3.82
+</td>
+<td style="text-align:right;">
+3.57
+</td>
+<td style="text-align:right;">
+4.23
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_hp51
+</td>
+<td style="text-align:left;">
+Sticks to the rules.
+</td>
+<td style="text-align:right;">
+3.58
+</td>
+<td style="text-align:right;">
+3.62
+</td>
+<td style="text-align:right;">
+3.34
+</td>
+<td style="text-align:right;">
+3.38
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+bfi_hp52
+</td>
+<td style="text-align:left;">
+Is not good at deceiving other people.
+</td>
+<td style="text-align:right;">
+3.06
+</td>
+<td style="text-align:right;">
+3.30
+</td>
+<td style="text-align:right;">
+3.04
+</td>
+<td style="text-align:right;">
+3.31
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div id="p1-p2-agreement" class="section level2">
 <h2>P1-P2 Agreement</h2>
