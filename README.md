@@ -3,7 +3,8 @@ Repository for Data &amp; Analyses in *Costello, C. K. &amp; Srivastava, S. (201
 
 * `Data/`folder contains the datasets
 * `Plots/` contain images of the plots, though they are also contained in the knitted html.
-*  `data_subsetting_perceiving_through_grapevine_2019(.Rmd/.Html)` shows the subsetting of the data; it will not run as it requires access to the original datasets which we have not shared yet.
+* `big_six_evaluativeness_icc(.Rmd/.Html)` calculates the ICC for the evaluativeness ratings used in the profile analyses. 
+* `data_subsetting_perceiving_through_grapevine_2019(.Rmd/.Html)` shows the subsetting of the data; it will not run as it requires access to the original datasets which we have not shared yet.
 * `perceiving_through_grapevine_2019(.Rmd/.Html)` recreates every analysis, table, and plot in the MS and its supplements (as well as some additional Information, Tables & Plots) from the initial submission (available [here](https://costello.netlify.com/files/Perceiving_personality_through_grapevine_08.09.2019.pdf)).
 * `perceiving_through_grapevine_2019_R-R(.Rmd/.Html)` recreates every analysis, table, and plot in the revised manuscript and its supplements (as well as some additional Information, Tables & Plots) from the revised submission.
 * `perceiving_through_grapevine_2019_SAMs(.Rmd/.Html)` has the SAM results separately for Study 1 and study 2.
