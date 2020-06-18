@@ -1,6 +1,6 @@
 ---
 title: "Profile Analyses (based on JPSP Round 1 reviews)"
-author: "MASKED FOR PEER REVIEW"
+author: "Cory K. Costello & Sanjay Srivastava"
 date: "last knitted: `r Sys.time()`"
 output:
     html_document:

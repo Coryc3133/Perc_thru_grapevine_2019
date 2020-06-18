@@ -1,6 +1,6 @@
 ---
 title: "Analyses in Perceiving through the Grapevine: A Network Approach to Reputations (Revision 1)"
-author: "MASKED FOR PEER REVIEW"
+author: "Cory K. Costello & Sanjay Srivastava"
 date: "last knitted: `r Sys.time()`"
 output:
     html_document:
