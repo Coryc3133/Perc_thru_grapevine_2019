@@ -1,5 +1,5 @@
 # Perc_thru_grapevine_2019
-Repository for Data &amp; Analyses in *Costello, C. K. &amp; Srivastava, S. (2019). Perceiving through the grapevine: A network approach to reputations.
+Repository for Data &amp; Analyses in *Costello, C. K. &amp; Srivastava, S. (2020). Perceiving through the grapevine: A network approach to reputations.
 
 * `Data/`folder contains the datasets
 * `Plots/` contain images of the plots, though they are also contained in the knitted html.
